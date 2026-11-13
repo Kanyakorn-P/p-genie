@@ -25,6 +25,51 @@ function uid() {
   return `id-${uidCounter}-${Date.now().toString(36)}`;
 }
 
+const SHORT_DAYS = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
+const FULL_DAYS = [
+  "อาทิตย์",
+  "จันทร์",
+  "อังคาร",
+  "พุธ",
+  "พฤหัสบดี",
+  "ศุกร์",
+  "เสาร์",
+];
+
+const emptySubscribe = () => () => {};
+
+function useMounted() {
+  return useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
+}
+
+function formatToday(date: Date) {
+  return new Intl.DateTimeFormat("th-TH", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
+function buildWeek(today: Date) {
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    const key =
+      i === 0 ? "วันนี้" : i === 1 ? "พรุ่งนี้" : `วัน${FULL_DAYS[d.getDay()]}`;
+    return {
+      day: String(d.getDate()),
+      label: i === 0 ? "วันนี้" : i === 1 ? "พรุ่งนี้" : SHORT_DAYS[d.getDay()],
+      active: i === 0,
+      dueKey: key,
+    };
+  });
+}
+
 export function GenieApp() {
   const [messages, setMessages] = useState<ChatMessage[]>([START_MESSAGE]);
   const [input, setInput] = useState("");
@@ -43,37 +88,9 @@ export function GenieApp() {
     }
   }, [rawTasks]);
 
-  const today = new Date();
-  const todayLabel = new Intl.DateTimeFormat("th-TH", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(today);
-
-  const shortDays = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
-  const fullDays = [
-    "อาทิตย์",
-    "จันทร์",
-    "อังคาร",
-    "พุธ",
-    "พฤหัสบดี",
-    "ศุกร์",
-    "เสาร์",
-  ];
-
-  const week = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    const key =
-      i === 0 ? "วันนี้" : i === 1 ? "พรุ่งนี้" : `วัน${fullDays[d.getDay()]}`;
-    return {
-      day: String(d.getDate()),
-      label: i === 0 ? "วันนี้" : i === 1 ? "พรุ่งนี้" : shortDays[d.getDay()],
-      active: i === 0,
-      dueKey: key,
-    };
-  });
+  const mounted = useMounted();
+  const todayLabel = mounted ? formatToday(new Date()) : "";
+  const week = mounted ? buildWeek(new Date()) : [];
 
   function dotsFor(dueKey: string) {
     return Math.min(
