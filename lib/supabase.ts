@@ -8,6 +8,12 @@ let client: SupabaseClient | null | undefined;
 
 function ownerToken() {
   try {
+    const fromUrl = new URLSearchParams(window.location.search).get("room");
+    if (fromUrl) {
+      window.localStorage.setItem(LOCAL_OWNER, fromUrl);
+      return fromUrl;
+    }
+
     let token = window.localStorage.getItem(LOCAL_OWNER);
     if (!token) {
       token = crypto.randomUUID();
