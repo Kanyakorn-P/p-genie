@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cream: #f7f1e1;
+  --color-cream-deep: #efe5ca;
+  --color-olive: #4f6b1f;
+  --color-olive-soft: #dce7c2;
+  --color-mustard: #f2c14e;
+  --color-mustard-soft: #fbebc0;
+  --color-peach: #fbe7da;
+  --color-mint: #e5eed6;
+  --color-ink: #2b2b2b;
+  --color-ink-soft: #6b6560;
+
+  --font-sans: var(--font-noto-thai);
+  --font-mali: var(--font-heading);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-cream);
+    color: var(--color-ink);
+    font-family: var(--font-noto-thai), sans-serif;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-mali), sans-serif;
+  }
+}
+
+@layer components {
+  .paper-card {
+    border: 2px solid var(--color-ink);
+    border-radius: 1.5rem;
+    background-color: #fffdf6;
+    box-shadow: 2px 3px 0 0 rgba(43, 43, 43, 0.9);
+  }
+
+  .dotted-bg {
+    background-image: radial-gradient(#ded2b2 1px, transparent 1px);
+    background-size: 18px 18px;
+  }
+}
