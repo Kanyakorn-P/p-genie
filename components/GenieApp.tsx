@@ -1,8 +1,13 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { FOLDER_SUBJECTS, SUBJECTS, type Task } from "@/lib/data";
-import { getServerSnapshot, getSnapshot, saveTasks, subscribe } from "@/lib/taskStore";
+import {
+  addTasks,
+  deleteTask,
+  listTasks,
+  setTaskDone,
+} from "@/lib/supabase";
 import { parseTasks } from "@/lib/parse";
 import { ChatPanel, type ChatMessage } from "./ChatPanel";
 import { GenieFace } from "./GenieFace";
@@ -73,20 +78,25 @@ function buildWeek(today: Date) {
 export function GenieApp() {
   const [messages, setMessages] = useState<ChatMessage[]>([START_MESSAGE]);
   const [input, setInput] = useState("");
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [ready, setReady] = useState(false);
 
-  const rawTasks = useSyncExternalStore(
-    subscribe,
-    getSnapshot,
-    getServerSnapshot,
-  );
-  const tasks = useMemo<Task[]>(() => {
-    try {
-      const parsed = JSON.parse(rawTasks);
-      return Array.isArray(parsed) ? (parsed as Task[]) : [];
-    } catch {
-      return [];
-    }
-  }, [rawTasks]);
+  useEffect(() => {
+    let alive = true;
+    listTasks()
+      .then((rows) => {
+        if (alive) setTasks(rows);
+      })
+      .catch(() => {
+        // อ่านจาก Supabase ไม่ได้ ปล่อยให้เริ่มจากลิสต์ว่าง
+      })
+      .finally(() => {
+        if (alive) setReady(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const mounted = useMounted();
   const todayLabel = mounted ? formatToday(new Date()) : "";
@@ -112,7 +122,16 @@ export function GenieApp() {
   const tomorrowTasks = tasks.filter((t) => t.due.includes("พรุ่งนี้"));
 
   function toggle(id: string) {
-    saveTasks(tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+    const next = !task.done;
+    setTasks(tasks.map((t) => (t.id === id ? { ...t, done: next } : t)));
+    void setTaskDone(id, next);
+  }
+
+  function remove(id: string) {
+    setTasks(tasks.filter((t) => t.id !== id));
+    void deleteTask(id);
   }
 
   function send() {
@@ -136,17 +155,17 @@ export function GenieApp() {
       return;
     }
 
-    saveTasks([
-      ...parsed.map((p) => ({
-        id: uid(),
-        title: p.title,
-        subject: p.subject,
-        due: p.due,
-        urgent: p.urgent,
-        done: false,
-      })),
-      ...tasks,
-    ]);
+    const newTasks: Task[] = parsed.map((p) => ({
+      id: uid(),
+      title: p.title,
+      subject: p.subject,
+      due: p.due,
+      urgent: p.urgent,
+      done: false,
+    }));
+
+    setTasks([...newTasks, ...tasks]);
+    void addTasks(newTasks);
 
     const list = parsed
       .map((p) => `• ${SUBJECTS[p.subject].short}: ${p.title} (${p.due})`)
@@ -564,13 +583,24 @@ export function GenieApp() {
                 </a>
               </div>
               <div className="mt-3 space-y-2.5">
-                {tasks.length === 0 && (
+                {!ready && (
+                  <p className="rounded-xl border border-dashed border-ink/30 px-3 py-4 text-center text-[11.5px] text-ink-soft">
+                    กำลังโหลดการบ้าน...
+                  </p>
+                )}
+                {ready && tasks.length === 0 && (
                   <p className="rounded-xl border border-dashed border-ink/30 px-3 py-4 text-center text-[11.5px] text-ink-soft">
                     ยังไม่มีการบ้านเลย พิมพ์บอกพี่จินนี่ในช่องแชทได้เลย
                   </p>
                 )}
                 {tasks.map((t) => (
-                  <TaskRow key={t.id} task={t} onToggle={toggle} wide />
+                  <TaskRow
+                    key={t.id}
+                    task={t}
+                    onToggle={toggle}
+                    onDelete={remove}
+                    wide
+                  />
                 ))}
               </div>
             </section>
@@ -649,10 +679,12 @@ function StatCard({
 function TaskRow({
   task,
   onToggle,
+  onDelete,
   wide = false,
 }: {
   task: Task;
   onToggle: (id: string) => void;
+  onDelete?: (id: string) => void;
   wide?: boolean;
 }) {
   const subject = SUBJECTS[task.subject];
@@ -693,7 +725,18 @@ function TaskRow({
           )}
         </div>
       </div>
-      {wide && <button className="shrink-0 text-ink-soft">🗑</button>}
+      {wide && (
+        <button
+          onClick={() => {
+            if (!onDelete) return;
+            if (window.confirm("ลบการบ้านนี้ออกใช่ไหม?")) onDelete(task.id);
+          }}
+          aria-label="ลบการบ้าน"
+          className="shrink-0 text-ink-soft hover:text-red"
+        >
+          🗑
+        </button>
+      )}
     </div>
   );
 }
