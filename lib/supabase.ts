@@ -89,7 +89,7 @@ export async function addTasks(tasks: Task[]): Promise<void> {
   }
 
   const token = ownerToken();
-  await supabase.from("tasks").insert(
+  const { error } = await supabase.from("tasks").insert(
     tasks.map((t) => ({
       id: t.id,
       owner_token: token,
@@ -100,6 +100,9 @@ export async function addTasks(tasks: Task[]): Promise<void> {
       done: t.done,
     })),
   );
+
+  // ยังไม่ได้รัน setup.sql หรือเน็ตหลุด เก็บสำรองในเครื่องไว้ก่อน งานจะไม่หาย
+  if (error) writeLocal([...tasks, ...readLocal()]);
 }
 
 export async function setTaskDone(id: string, done: boolean): Promise<void> {
