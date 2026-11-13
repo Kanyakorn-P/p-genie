@@ -1,19 +1,23 @@
-import { SUBJECTS, type SubjectKey } from "./data";
+import { NO_SUBJECT } from "./data";
 
 export type ParsedTask = {
   title: string;
-  subject: SubjectKey;
+  subject: string;
   due: string;
   urgent: boolean;
 };
 
-const SUBJECT_REGEX = /(ฟิสิกส์|ฟิ|ภาษาไทย|ไทย|คณิตศาสตร์|คณิต)/g;
+const SUBJECT_REGEX = /(ฟิสิกส์|ฟิ|ภาษาไทย|ไทย|คณิตศาสตร์|คณิต|สังคม|อังกฤษ|ภาษาอังกฤษ|ชีวะ|ชีววิทยา|เคมี)/g;
 
-function toSubject(word: string): SubjectKey {
+function toSubject(word: string): string {
   if (word.startsWith("ฟิ")) return "ฟิสิกส์";
-  if (word.includes("คณิต")) return "คณิต";
+  if (word.startsWith("คณิต")) return "คณิต";
   if (word.includes("ไทย")) return "ไทย";
-  return "อื่นๆ";
+  if (word.includes("อังกฤษ")) return "อังกฤษ";
+  if (word.includes("สังคม")) return "สังคม";
+  if (word.startsWith("ชีว")) return "ชีววิทยา";
+  if (word.includes("เคมี")) return "เคมี";
+  return NO_SUBJECT;
 }
 
 const WEEKDAYS: Record<string, string> = {
@@ -63,7 +67,7 @@ function detectDue(text: string): DueResult | null {
   return null;
 }
 
-function cleanTitle(raw: string, subject: SubjectKey, due: DueResult | null) {
+function cleanTitle(raw: string, subject: string, due: DueResult | null) {
   let t = raw;
   if (due) t = t.replace(due.raw, " ");
   t = t.replace(SUBJECT_REGEX, " ");
@@ -72,7 +76,7 @@ function cleanTitle(raw: string, subject: SubjectKey, due: DueResult | null) {
   t = t.replace(/[.,;:!?()"'“”]+/g, " ");
   t = t.replace(/\s+/g, " ").trim();
 
-  if (!t) return `การบ้าน${SUBJECTS[subject].short}`;
+  if (!t) return subject === NO_SUBJECT ? "การบ้าน" : `การบ้าน${subject}`;
   if (/^หน้า\s*\d/.test(t)) t = `การบ้าน${t}`;
   if (/^\d/.test(t)) t = `การบ้าน ${t}`;
   return t.length > 90 ? `${t.slice(0, 88)}…` : t;
@@ -91,10 +95,10 @@ export function parseTasks(input: string): ParsedTask[] {
 
   for (const chunk of chunks.length > 0 ? chunks : [text]) {
     const matches = [...chunk.matchAll(SUBJECT_REGEX)];
-    const segments: { subject: SubjectKey; text: string }[] = [];
+    const segments: { subject: string; text: string }[] = [];
 
     if (matches.length === 0) {
-      segments.push({ subject: "อื่นๆ", text: chunk });
+      segments.push({ subject: NO_SUBJECT, text: chunk });
     } else {
       matches.forEach((m, i) => {
         const start = m.index ?? 0;

@@ -12,9 +12,21 @@ create table if not exists public.tasks (
 
 create index if not exists tasks_owner_idx on public.tasks (owner_token);
 
+-- ตารางโฟลเดอร์วิชา (เพิ่ม แก้ชื่อ ลบ ได้จากหน้าแอป)
+create table if not exists public.folders (
+  id text primary key,
+  owner_token text not null,
+  name text not null,
+  color text not null default 'blue',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists folders_owner_idx on public.folders (owner_token);
+
 -- เปิดกฎ RLS: ลิงก์แอปเป็นสาธารณะ ทุกคนที่มีกุญแจ publishable เรียก API ได้
 -- แต่จะเห็นเฉพาะแถวที่ owner_token ตรงกับหัวข้อ x-owner-token ที่เบราว์เซอร์เราส่งมา
 alter table public.tasks enable row level security;
+alter table public.folders enable row level security;
 
 drop policy if exists "tasks_select_own" on public.tasks;
 create policy "tasks_select_own" on public.tasks
@@ -34,5 +46,26 @@ create policy "tasks_update_own" on public.tasks
 
 drop policy if exists "tasks_delete_own" on public.tasks;
 create policy "tasks_delete_own" on public.tasks
+  for delete
+  using (owner_token = (current_setting('request.headers', true)::json ->> 'x-owner-token'));
+
+drop policy if exists "folders_select_own" on public.folders;
+create policy "folders_select_own" on public.folders
+  for select
+  using (owner_token = (current_setting('request.headers', true)::json ->> 'x-owner-token'));
+
+drop policy if exists "folders_insert_own" on public.folders;
+create policy "folders_insert_own" on public.folders
+  for insert
+  with check (owner_token = (current_setting('request.headers', true)::json ->> 'x-owner-token'));
+
+drop policy if exists "folders_update_own" on public.folders;
+create policy "folders_update_own" on public.folders
+  for update
+  using (owner_token = (current_setting('request.headers', true)::json ->> 'x-owner-token'))
+  with check (owner_token = (current_setting('request.headers', true)::json ->> 'x-owner-token'));
+
+drop policy if exists "folders_delete_own" on public.folders;
+create policy "folders_delete_own" on public.folders
   for delete
   using (owner_token = (current_setting('request.headers', true)::json ->> 'x-owner-token'));

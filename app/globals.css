@@ -1,16 +1,30 @@
 @import "tailwindcss";
 
 @theme {
-  --color-cream: #f7f1e1;
-  --color-cream-deep: #efe5ca;
-  --color-olive: #4f6b1f;
-  --color-olive-soft: #dce7c2;
-  --color-mustard: #f2c14e;
-  --color-mustard-soft: #fbebc0;
-  --color-peach: #fbe7da;
-  --color-mint: #e5eed6;
-  --color-ink: #2b2b2b;
-  --color-ink-soft: #6b6560;
+  --color-cream: #faf4e6;
+  --color-cream-deep: #f3ead6;
+  --color-paper: #fffdf9;
+  --color-line: #eae0cb;
+
+  --color-navy: #1f3a63;
+  --color-navy-deep: #22386b;
+  --color-blue: #2f6be0;
+  --color-blue-soft: #dbe7f9;
+
+  --color-yellow: #f6c445;
+  --color-yellow-soft: #fdf0c9;
+
+  --color-red: #c3453b;
+  --color-red-soft: #f9dcd6;
+
+  --color-green: #4c7a4a;
+  --color-green-soft: #dfeedb;
+
+  --color-plum: #7a5aa8;
+  --color-plum-soft: #e9e1f6;
+
+  --color-ink: #23272e;
+  --color-muted: #8a8272;
 
   --font-sans: var(--font-noto-thai);
   --font-mali: var(--font-heading);
@@ -28,18 +42,33 @@
   h3 {
     font-family: var(--font-mali), sans-serif;
   }
+
+  button {
+    cursor: pointer;
+  }
 }
 
 @layer components {
-  .paper-card {
-    border: 2px solid var(--color-ink);
+  .surface {
+    border: 1px solid var(--color-line);
     border-radius: 1.5rem;
-    background-color: #fffdf6;
-    box-shadow: 2px 3px 0 0 rgba(43, 43, 43, 0.9);
+    background-color: var(--color-paper);
   }
 
-  .dotted-bg {
-    background-image: radial-gradient(#ded2b2 1px, transparent 1px);
-    background-size: 18px 18px;
+  .soft-shadow {
+    box-shadow: 0 12px 28px -24px rgba(31, 58, 99, 0.7);
+  }
+
+  .focus-ring:focus-visible {
+    outline: 2px solid var(--color-blue);
+    outline-offset: 2px;
+  }
+}
+
+/* แถบเลื่อนบาง ๆ ให้เข้ากับพื้นครีม */
+@layer utilities {
+  .thin-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #e3d8c0 transparent;
   }
 }

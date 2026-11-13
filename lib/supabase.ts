@@ -6,7 +6,7 @@ const LOCAL_OWNER = "p-genie-owner-v1";
 
 let client: SupabaseClient | null | undefined;
 
-function ownerToken() {
+export function ownerToken() {
   try {
     const fromUrl = new URLSearchParams(window.location.search).get("room");
     if (fromUrl) {
@@ -25,7 +25,7 @@ function ownerToken() {
   }
 }
 
-function getClient() {
+export function getSupabase(): SupabaseClient | null {
   if (client !== undefined) return client;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -61,7 +61,7 @@ function writeLocal(tasks: Task[]) {
 }
 
 export async function listTasks(): Promise<Task[]> {
-  const supabase = getClient();
+  const supabase = getSupabase();
   if (!supabase) return readLocal();
 
   const { data, error } = await supabase
@@ -74,7 +74,7 @@ export async function listTasks(): Promise<Task[]> {
   return data.map((row) => ({
     id: String(row.id),
     title: String(row.title),
-    subject: row.subject as Task["subject"],
+    subject: String(row.subject),
     due: String(row.due),
     urgent: Boolean(row.urgent),
     done: Boolean(row.done),
@@ -82,7 +82,7 @@ export async function listTasks(): Promise<Task[]> {
 }
 
 export async function addTasks(tasks: Task[]): Promise<void> {
-  const supabase = getClient();
+  const supabase = getSupabase();
   if (!supabase) {
     writeLocal([...tasks, ...readLocal()]);
     return;
@@ -106,7 +106,7 @@ export async function addTasks(tasks: Task[]): Promise<void> {
 }
 
 export async function setTaskDone(id: string, done: boolean): Promise<void> {
-  const supabase = getClient();
+  const supabase = getSupabase();
   if (!supabase) {
     writeLocal(readLocal().map((t) => (t.id === id ? { ...t, done } : t)));
     return;
@@ -116,11 +116,32 @@ export async function setTaskDone(id: string, done: boolean): Promise<void> {
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  const supabase = getClient();
+  const supabase = getSupabase();
   if (!supabase) {
     writeLocal(readLocal().filter((t) => t.id !== id));
     return;
   }
 
   await supabase.from("tasks").delete().eq("id", id);
+}
+
+// เปลี่ยนชื่อวิชาในการบ้านทั้งหมด เมื่อผู้ใช้แก้ชื่อโฟลเดอร์
+export async function renameTaskSubject(
+  oldName: string,
+  newName: string,
+): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) {
+    writeLocal(
+      readLocal().map((t) =>
+        t.subject === oldName ? { ...t, subject: newName } : t,
+      ),
+    );
+    return;
+  }
+
+  await supabase
+    .from("tasks")
+    .update({ subject: newName })
+    .eq("subject", oldName);
 }

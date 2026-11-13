@@ -1,16 +1,52 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
-import { FOLDER_SUBJECTS, SUBJECTS, type Task } from "@/lib/data";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { subjectLabel, type Task } from "@/lib/data";
+import { parseTasks } from "@/lib/parse";
+import {
+  deleteFolderRow,
+  insertFolder,
+  listFolders,
+  updateFolder,
+} from "@/lib/folders";
+import {
+  colorForName,
+  folderForSubject,
+  toneFor,
+  type Folder,
+  type FolderColor,
+} from "@/lib/theme";
 import {
   addTasks,
   deleteTask,
   listTasks,
+  ownerToken,
+  renameTaskSubject,
   setTaskDone,
 } from "@/lib/supabase";
-import { parseTasks } from "@/lib/parse";
 import { ChatPanel, type ChatMessage } from "./ChatPanel";
+import { FolderDialog } from "./FolderDialog";
 import { GenieFace } from "./GenieFace";
+import { Sidebar, type NavKey } from "./Sidebar";
+import { TaskRow } from "./TaskRow";
+import { CatFolderIcon } from "./icons";
+import {
+  IconBell,
+  IconClose,
+  IconLink,
+  IconPencil,
+  IconPlus,
+  IconSearch,
+  IconSparkle,
+  IconTrash,
+} from "./ui-icons";
 
 const START_MESSAGE: ChatMessage = {
   id: "hello",
@@ -23,6 +59,21 @@ const CHIPS = [
   "ไทยแต่งกลอน 2 บท ส่งศุกร์หน้า",
   "คณิตทำโจทย์ 10 ข้อ",
 ];
+
+type Filter =
+  | { kind: "folder"; id: string; name: string }
+  | { kind: "due"; key: string }
+  | null;
+
+type ProgressRow = {
+  key: string;
+  id: string | null;
+  name: string;
+  label: string;
+  color: FolderColor;
+  total: number;
+  done: number;
+};
 
 let uidCounter = 0;
 function uid() {
@@ -51,6 +102,22 @@ function useMounted() {
   );
 }
 
+function useMediaQuery(query: string) {
+  const subscribe = useCallback(
+    (callback: () => void) => {
+      const mql = window.matchMedia(query);
+      mql.addEventListener("change", callback);
+      return () => mql.removeEventListener("change", callback);
+    },
+    [query],
+  );
+  const getSnapshot = useCallback(
+    () => window.matchMedia(query).matches,
+    [query],
+  );
+  return useSyncExternalStore(subscribe, getSnapshot, () => false);
+}
+
 function formatToday(date: Date) {
   return new Intl.DateTimeFormat("th-TH", {
     weekday: "long",
@@ -75,63 +142,232 @@ function buildWeek(today: Date) {
   });
 }
 
+function dueMatches(due: string, key: string) {
+  return due.includes(key);
+}
+
 export function GenieApp() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [ready, setReady] = useState(false);
+
   const [messages, setMessages] = useState<ChatMessage[]>([START_MESSAGE]);
   const [input, setInput] = useState("");
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [ready, setReady] = useState(false);
+
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<Filter>(null);
+  const [activeNav, setActiveNav] = useState<NavKey>("home");
+  const [dialog, setDialog] = useState<
+    { mode: "create" } | { mode: "edit"; folder: Folder } | null
+  >(null);
+  const [pop, setPop] = useState<"bell" | "account" | null>(null);
+  const [roomCode, setRoomCode] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
+
+  const chatInputRef = useRef<HTMLInputElement>(null);
+  const mounted = useMounted();
+  const wide = useMediaQuery("(min-width: 1280px)");
 
   useEffect(() => {
     let alive = true;
-    listTasks()
-      .then((rows) => {
-        if (alive) setTasks(rows);
+
+    Promise.all([listTasks(), listFolders()])
+      .then(([loadedTasks, loadedFolders]) => {
+        if (!alive) return;
+        setTasks(loadedTasks);
+        setFolders(loadedFolders);
       })
       .catch(() => {
-        // อ่านจาก Supabase ไม่ได้ ปล่อยให้เริ่มจากลิสต์ว่าง
+        // อ่านข้อมูลไม่ได้ เริ่มจากลิสต์ว่าง
       })
       .finally(() => {
         if (alive) setReady(true);
       });
+
     return () => {
       alive = false;
     };
   }, []);
 
-  const mounted = useMounted();
+  function flash(message: string) {
+    setToast(message);
+    window.setTimeout(() => setToast(null), 2400);
+  }
+
   const todayLabel = mounted ? formatToday(new Date()) : "";
   const week = mounted ? buildWeek(new Date()) : [];
-
-  function dotsFor(dueKey: string) {
-    return Math.min(
-      tasks.filter((t) => !t.done && t.due.includes(dueKey)).length,
-      3,
-    );
-  }
 
   const total = tasks.length;
   const done = tasks.filter((t) => t.done).length;
   const pending = total - done;
-  const tomorrowCount = tasks.filter(
-    (t) => !t.done && t.due.includes("พรุ่งนี้"),
-  ).length;
-  const noDueCount = tasks.filter(
-    (t) => !t.done && t.due === "ยังไม่ระบุวันส่ง",
-  ).length;
   const percent = total === 0 ? 0 : Math.round((done / total) * 100);
-  const tomorrowTasks = tasks.filter((t) => t.due.includes("พรุ่งนี้"));
+
+  const folderStats = useMemo(() => {
+    const byFolder = new Map<string, { total: number; done: number }>();
+    for (const f of folders) byFolder.set(f.id, { total: 0, done: 0 });
+    const loose = new Map<string, { total: number; done: number }>();
+
+    for (const t of tasks) {
+      const folder = folderForSubject(t.subject, folders);
+      const bucket = folder ? byFolder : loose;
+      const key = folder ? folder.id : t.subject;
+      const row = bucket.get(key) ?? { total: 0, done: 0 };
+      row.total += 1;
+      if (t.done) row.done += 1;
+      bucket.set(key, row);
+    }
+
+    return { byFolder, loose };
+  }, [tasks, folders]);
+
+  const counts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const f of folders) {
+      map[f.name] = folderStats.byFolder.get(f.id)?.total ?? 0;
+    }
+    return map;
+  }, [folders, folderStats]);
+
+  const visibleTasks = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return tasks.filter((t) => {
+      if (filter?.kind === "folder") {
+        const folder = folderForSubject(t.subject, folders);
+        if (folder?.id !== filter.id) return false;
+      }
+      if (filter?.kind === "due" && !dueMatches(t.due, filter.key)) return false;
+      if (!q) return true;
+      return `${t.title} ${subjectLabel(t.subject)} ${t.due}`
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [tasks, filter, query, folders]);
+
+  const tomorrowTasks = useMemo(
+    () => tasks.filter((t) => !t.done && dueMatches(t.due, "พรุ่งนี้")),
+    [tasks],
+  );
+
+  const urgentTasks = useMemo(
+    () =>
+      tasks.filter(
+        (t) =>
+          !t.done &&
+          (dueMatches(t.due, "วันนี้") || dueMatches(t.due, "พรุ่งนี้")),
+      ),
+    [tasks],
+  );
+
+  const progressRows = useMemo<ProgressRow[]>(() => {
+    const rows: ProgressRow[] = folders.map((folder) => {
+      const stat = folderStats.byFolder.get(folder.id) ?? { total: 0, done: 0 };
+      return {
+        key: folder.id,
+        id: folder.id,
+        name: folder.name,
+        label: folder.name,
+        color: folder.color,
+        total: stat.total,
+        done: stat.done,
+      };
+    });
+
+    folderStats.loose.forEach((stat, name) => {
+      rows.push({
+        key: `subject-${name}`,
+        id: null,
+        name,
+        label: subjectLabel(name),
+        color: colorForName(name, folders),
+        total: stat.total,
+        done: stat.done,
+      });
+    });
+
+    return rows;
+  }, [folders, folderStats]);
+
+  function scrollTo(id: string) {
+    document
+      .getElementById(id)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function focusChat() {
+    scrollTo("chat");
+    window.setTimeout(() => chatInputRef.current?.focus(), 300);
+  }
+
+  function handleNav(key: NavKey) {
+    setActiveNav(key);
+    if (key === "home") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (key === "chat") {
+      focusChat();
+      return;
+    }
+    if (key === "tasks") {
+      setFilter(null);
+      scrollTo("tasks");
+      return;
+    }
+    scrollTo("reminder");
+  }
 
   function toggle(id: string) {
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
     const next = !task.done;
-    setTasks(tasks.map((t) => (t.id === id ? { ...t, done: next } : t)));
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: next } : t)));
     void setTaskDone(id, next);
   }
 
-  function remove(id: string) {
-    setTasks(tasks.filter((t) => t.id !== id));
+  function removeTask(id: string) {
+    setTasks((prev) => prev.filter((t) => t.id !== id));
     void deleteTask(id);
+    flash("ลบการบ้านแล้ว");
+  }
+
+  function saveFolder(name: string, color: FolderColor) {
+    if (!dialog) return;
+
+    if (dialog.mode === "edit") {
+      const old = dialog.folder;
+      const next: Folder = { ...old, name, color };
+      setFolders((prev) => prev.map((f) => (f.id === old.id ? next : f)));
+      setTasks((prev) =>
+        prev.map((t) => (t.subject === old.name ? { ...t, subject: name } : t)),
+      );
+      if (filter?.kind === "folder" && filter.id === old.id) {
+        setFilter({ kind: "folder", id: old.id, name });
+      }
+      void updateFolder(next);
+      if (old.name !== name) void renameTaskSubject(old.name, name);
+      flash(`เปลี่ยนชื่อโฟลเดอร์เป็น "${name}" แล้ว`);
+    } else {
+      const folder: Folder = { id: uid(), name, color };
+      setFolders((prev) => [...prev, folder]);
+      void insertFolder(folder);
+      flash(`เพิ่มโฟลเดอร์ "${name}" แล้ว`);
+    }
+
+    setDialog(null);
+  }
+
+  function removeFolder(folder: Folder) {
+    const ok = window.confirm(
+      `ลบโฟลเดอร์ "${folder.name}" ใช่ไหม?\nการบ้านในโฟลเดอร์นี้ยังอยู่ ไม่ถูกลบ`,
+    );
+    if (!ok) return;
+
+    setFolders((prev) => prev.filter((f) => f.id !== folder.id));
+    if (filter?.kind === "folder" && filter.id === folder.id) {
+      setFilter(null);
+    }
+    void deleteFolderRow(folder.id);
+    flash(`ลบโฟลเดอร์ "${folder.name}" แล้ว`);
   }
 
   function send() {
@@ -164,11 +400,11 @@ export function GenieApp() {
       done: false,
     }));
 
-    setTasks([...newTasks, ...tasks]);
+    setTasks((prev) => [...newTasks, ...prev]);
     void addTasks(newTasks);
 
     const list = parsed
-      .map((p) => `• ${SUBJECTS[p.subject].short}: ${p.title} (${p.due})`)
+      .map((p) => `• ${subjectLabel(p.subject)}: ${p.title} (${p.due})`)
       .join("\n");
 
     setMessages((prev) => [
@@ -177,565 +413,678 @@ export function GenieApp() {
       {
         id: uid(),
         role: "genie",
-        text: `จดให้แล้ว ${parsed.length} งานน้า ✨\n${list}\nถ้าวันส่งผิด บอกพี่จินนี่ได้เลย`,
+        text: `จดให้แล้ว ${parsed.length} งานน้า ✨\n${list}\nถ้าอยากแยกเป็นโฟลเดอร์วิชา บอกพี่จินนี่ได้เลย`,
       },
     ]);
     setInput("");
+    setActiveNav("chat");
   }
 
-  const chatProps = {
-    messages,
-    input,
-    onInput: setInput,
-    onSend: send,
-    chips: CHIPS,
-    onChip: setInput,
-  };
+  function toggleFolderFilter(folder: Folder) {
+    setActiveNav("tasks");
+    setFilter((prev) =>
+      prev?.kind === "folder" && prev.id === folder.id
+        ? null
+        : { kind: "folder", id: folder.id, name: folder.name },
+    );
+  }
+
+  async function copyRoomLink() {
+    const token = ownerToken();
+    const link = `${window.location.origin}${window.location.pathname}?room=${token}`;
+    setRoomCode(token);
+
+    try {
+      await navigator.clipboard.writeText(link);
+      flash("คัดลอกลิงก์ห้องนี้แล้ว เอาไปเปิดในมือถือได้เลย");
+    } catch {
+      flash("คัดลอกอัตโนมัติไม่ได้ ลิงก์อยู่ข้างบนน้า");
+    }
+  }
+
+  const activeFilterLabel =
+    filter?.kind === "folder"
+      ? `โฟลเดอร์: ${filter.name}`
+      : filter?.kind === "due"
+        ? `กำหนดส่ง: ${filter.key}`
+        : null;
+
+  const chatPanel = (
+    <ChatPanel
+      messages={messages}
+      input={input}
+      onInput={setInput}
+      onSend={send}
+      chips={CHIPS}
+      onChip={setInput}
+      inputRef={chatInputRef}
+      messagesClassName={wide ? "flex-1" : "h-[300px]"}
+    />
+  );
 
   return (
     <div className="flex min-h-screen bg-cream">
-      <aside className="sticky top-0 hidden h-screen w-[268px] shrink-0 flex-col border-r-2 border-ink bg-[#fdf8ec] lg:flex">
-        <div className="flex items-center gap-3 border-b-2 border-ink px-4 py-4">
-          <GenieFace size={44} />
-          <div className="leading-tight">
-            <p className="font-mali text-[15px] font-bold">
-              พี่จินนี่ (P&apos; Genie) ✨
-            </p>
-            <p className="text-[11px] text-ink-soft">AI To-Do List Agent</p>
-          </div>
-        </div>
-
-        <div className="flex gap-2 px-4 py-4">
-          <a
-            href="#chat"
-            className="flex-1 rounded-full border-2 border-ink bg-olive px-3 py-2 text-center text-[12px] font-semibold text-cream"
-          >
-            + เพิ่มการบ้าน
-          </a>
-          <button className="flex-1 rounded-full border-2 border-ink bg-[#fffdf6] px-3 py-2 text-[12px] font-semibold">
-            + เพิ่มวิชา
-          </button>
-        </div>
-
-        <p className="px-5 pb-2 text-[11px] font-semibold tracking-wide text-ink-soft">
-          เมนูหลัก
-        </p>
-        <nav className="space-y-1 px-3">
-          <div className="flex items-center gap-2 rounded-xl bg-olive px-3 py-2 text-[12.5px] text-cream">
-            <span className="h-4 w-4 rounded border border-current opacity-70" />
-            <span className="flex-1">หน้าหลัก (Home)</span>
-          </div>
-          <a
-            href="#chat"
-            className="flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] text-ink hover:bg-cream-deep"
-          >
-            <span className="h-4 w-4 rounded border border-current opacity-70" />
-            <span className="flex-1">แชทกับพี่จินนี่ (AI Agent)</span>
-            <span className="rounded-full bg-mustard px-2 py-0.5 text-[10px] font-bold text-ink">
-              AI ✨
-            </span>
-          </a>
-          <div className="flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] text-ink hover:bg-cream-deep">
-            <span className="h-4 w-4 rounded border border-current opacity-70" />
-            <span className="flex-1">การบ้าน &amp; ทุกวิชา</span>
-            <span className="grid h-5 w-5 place-items-center rounded-full bg-olive text-[10px] font-bold text-cream">
-              {pending}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] text-ink hover:bg-cream-deep">
-            <span className="h-4 w-4 rounded border border-current opacity-70" />
-            <span className="flex-1">ตั้งเวลาเตือนความจำ</span>
-          </div>
-        </nav>
-
-        <div className="mt-6 flex items-center justify-between px-5 pb-2 text-[11px] font-semibold text-ink-soft">
-          <span>ไฟลเดอร์วิชา (3)</span>
-          <span className="text-olive">+</span>
-        </div>
-        <div className="space-y-1 px-3">
-          {FOLDER_SUBJECTS.map((s) => (
-            <div
-              key={s.key}
-              className="flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] hover:bg-cream-deep"
-            >
-              <span className={`h-3 w-3 rounded-full ${s.dot}`} />
-              <span className="flex-1">
-                {s.short}
-                <span className="text-ink-soft"> ({s.full})</span>
-              </span>
-              <span className="grid h-5 w-5 place-items-center rounded-full bg-mustard text-[10px] font-bold">
-                {tasks.filter((t) => t.subject === s.key).length}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-auto m-3 flex items-center gap-3 rounded-2xl border-2 border-ink bg-[#fffdf6] px-3 py-3">
-          <GenieFace size={34} />
-          <div className="leading-tight">
-            <p className="text-[12px] font-semibold">พี่จินนี่ สแตนด์บาย</p>
-            <p className="text-[10.5px] text-ink-soft">
-              พร้อมบริการห้าดาวตลอดงาน
-            </p>
-          </div>
-        </div>
-      </aside>
+      <Sidebar
+        folders={folders}
+        counts={counts}
+        pending={pending}
+        activeNav={activeNav}
+        activeFolderId={filter?.kind === "folder" ? filter.id : null}
+        onNav={handleNav}
+        onFocusChat={focusChat}
+        onAddFolder={() => setDialog({ mode: "create" })}
+        onEditFolder={(folder) => setDialog({ mode: "edit", folder })}
+        onDeleteFolder={removeFolder}
+        onFilterFolder={toggleFolderFilter}
+      />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex items-center gap-3 border-b-2 border-ink bg-[#fdf8ec] px-5 py-3">
-          <label className="flex max-w-md flex-1 items-center gap-2 rounded-full border-2 border-ink bg-[#fffdf6] px-4 py-2">
-            <span className="text-ink-soft">⌕</span>
+        <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b border-line bg-cream/95 px-4 py-3 backdrop-blur sm:px-6">
+          <div className="flex items-center gap-2 lg:hidden">
+            <GenieFace size={34} />
+            <div className="leading-tight">
+              <p className="font-mali text-[15px] font-bold text-navy">
+                พี่จินนี่
+              </p>
+              <p className="text-[8px] font-semibold tracking-[0.12em] text-muted">
+                AI TO-DO LIST
+              </p>
+            </div>
+          </div>
+
+          <label className="order-3 flex min-w-0 flex-1 items-center gap-2 rounded-full border border-line bg-paper px-4 py-2 transition focus-within:border-blue sm:order-none">
+            <IconSearch size={16} className="shrink-0 text-muted" />
             <input
-              className="w-full bg-transparent text-[12.5px] outline-none placeholder:text-ink-soft"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
               placeholder="ค้นหาการบ้าน, วิชา, เลขหน้า..."
+              aria-label="ค้นหาการบ้าน"
+              className="w-full bg-transparent text-[12.5px] outline-none placeholder:text-muted"
             />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                aria-label="ล้างคำค้นหา"
+                className="focus-ring shrink-0 rounded-full text-muted hover:text-navy"
+              >
+                <IconClose size={14} />
+              </button>
+            )}
           </label>
+
           <div className="ml-auto flex items-center gap-2">
-            <a
-              href="#chat"
-              className="rounded-full border-2 border-ink bg-olive px-4 py-1.5 text-[12px] font-semibold text-cream"
+            <button
+              onClick={focusChat}
+              className="focus-ring flex items-center gap-1.5 rounded-full bg-navy px-3.5 py-2 text-[12px] font-semibold text-paper transition hover:bg-navy-deep"
             >
-              + เพิ่มการบ้าน
-            </a>
-            <button className="grid h-9 w-9 place-items-center rounded-full border-2 border-ink bg-[#fffdf6]">
-              🔔
+              <IconPlus size={14} />
+              เพิ่มการบ้าน
             </button>
-            <div className="grid h-9 w-9 place-items-center rounded-full border-2 border-ink bg-mustard text-[12px] font-bold">
-              จ
+
+            <div className="relative">
+              <button
+                onClick={() => setPop(pop === "bell" ? null : "bell")}
+                aria-label="งานที่ใกล้ถึงกำหนด"
+                aria-expanded={pop === "bell"}
+                className="focus-ring relative grid h-9 w-9 place-items-center rounded-full border border-line bg-paper text-navy transition hover:border-blue"
+              >
+                <IconBell size={17} />
+                {urgentTasks.length > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-red px-1 text-[9px] font-bold text-paper">
+                    {urgentTasks.length}
+                  </span>
+                )}
+              </button>
+
+              {pop === "bell" && (
+                <>
+                  <div
+                    className="fixed inset-0 z-20"
+                    onClick={() => setPop(null)}
+                    aria-hidden="true"
+                  />
+                  <div className="soft-shadow absolute right-0 top-11 z-30 w-[280px] rounded-2xl border border-line bg-paper p-3">
+                    <p className="px-1 text-[12px] font-semibold text-navy">
+                      ใกล้ถึงกำหนด
+                    </p>
+                    {urgentTasks.length === 0 ? (
+                      <p className="mt-2 rounded-xl bg-cream px-3 py-3 text-[11.5px] text-muted">
+                        ยังไม่มีงานที่ต้องส่งวันนี้หรือพรุ่งนี้ ✨
+                      </p>
+                    ) : (
+                      <ul className="mt-2 space-y-1.5">
+                        {urgentTasks.slice(0, 5).map((t) => (
+                          <li
+                            key={t.id}
+                            className="rounded-xl bg-cream px-3 py-2 text-[11.5px]"
+                          >
+                            <p className="truncate font-medium">{t.title}</p>
+                            <p className="text-[10.5px] text-muted">
+                              {subjectLabel(t.subject)} • {t.due}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <button
+                      onClick={() => {
+                        setFilter({ kind: "due", key: "พรุ่งนี้" });
+                        setPop(null);
+                        setActiveNav("tasks");
+                        scrollTo("tasks");
+                      }}
+                      className="focus-ring mt-2 w-full rounded-xl bg-blue-soft px-3 py-2 text-[11.5px] font-semibold text-navy hover:bg-blue"
+                    >
+                      ดูงานที่ต้องส่งพรุ่งนี้
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setRoomCode(ownerToken());
+                  setPop(pop === "account" ? null : "account");
+                }}
+                aria-label="บัญชีและลิงก์ห้อง"
+                aria-expanded={pop === "account"}
+                className="focus-ring grid h-9 w-9 place-items-center rounded-full bg-yellow text-[12px] font-bold text-navy"
+              >
+                จ
+              </button>
+
+              {pop === "account" && (
+                <>
+                  <div
+                    className="fixed inset-0 z-20"
+                    onClick={() => setPop(null)}
+                    aria-hidden="true"
+                  />
+                  <div className="soft-shadow absolute right-0 top-11 z-30 w-[290px] rounded-2xl border border-line bg-paper p-4">
+                    <p className="text-[12px] font-semibold text-navy">
+                      ลิงก์ห้องนี้
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                      เปิดลิงก์เดียวกันบนมือถือ จะเห็นการบ้านชุดเดียวกัน
+                    </p>
+                    <p className="mt-2 truncate rounded-lg bg-cream px-2.5 py-1.5 text-[10.5px] text-muted">
+                      ?room={roomCode || "..."}
+                    </p>
+                    <button
+                      onClick={() => {
+                        void copyRoomLink();
+                        setPop(null);
+                      }}
+                      className="focus-ring mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl bg-navy px-3 py-2 text-[11.5px] font-semibold text-paper hover:bg-navy-deep"
+                    >
+                      <IconLink size={13} />
+                      คัดลอกลิงก์ห้อง
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </header>
 
-        <div className="flex min-w-0 flex-1">
-          <main className="min-w-0 flex-1 space-y-5 p-5">
-            <section className="paper-card relative overflow-hidden p-6">
-              <div className="max-w-2xl">
-                <span className="inline-flex items-center gap-1 rounded-full border border-ink/30 bg-mustard-soft px-3 py-1 text-[11px] font-semibold">
-                  ✨ ยินดีต้อนรับสู่ผู้ช่วยการบ้าน AI อัจฉริยะ
-                </span>
-                <h1 className="mt-3 font-mali text-[26px] font-bold leading-snug">
-                  {pending === 0 ? (
-                    <>
-                      หวัดดีจ้า! ตอนนี้ยังไม่มีงานค้างเลย{" "}
-                      <span className="text-olive underline decoration-mustard decoration-4 underline-offset-4">
-                        ลุยเลย
-                      </span>{" "}
-                      ✨
-                    </>
-                  ) : (
-                    <>
-                      หวัดดีจ้า! วันนี้มีงานค้าง{" "}
-                      <span className="text-olive underline decoration-mustard decoration-4 underline-offset-4">
-                        {pending} อย่าง
-                      </span>{" "}
-                      น้า ✨
-                    </>
-                  )}
-                </h1>
-                <p className="mt-1 text-[13px] text-ink-soft">
-                  พี่จินนี่พร้อมช่วยจดการบ้าน แยกวิชา และเตือนความจำก่อนถึงเดตไลน์
-                  พิมพ์บอกในแชทได้เลย!
-                </p>
-
-                <div className="mt-5 max-w-md">
-                  <div className="flex justify-between text-[11.5px] font-medium">
-                    <span>ความคืบหน้าการบ้านทั้งหมด</span>
-                    <span>
-                      {done}/{total} งาน ({percent}%)
-                    </span>
-                  </div>
-                  <div className="mt-1 h-3 overflow-hidden rounded-full border-2 border-ink bg-[#fffdf6]">
-                    <div
-                      className="h-full rounded-full bg-olive transition-all"
-                      style={{ width: `${percent}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="absolute -bottom-6 -right-4 grid h-40 w-40 place-items-center rounded-full bg-mustard-soft/70 max-lg:hidden">
-                <GenieFace size={104} />
-              </div>
-            </section>
-
-            <section id="chat" className="paper-card scroll-mt-24 p-4 xl:hidden">
-              <ChatPanel {...chatProps} messagesClassName="h-[260px]" />
-            </section>
-
-            <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-              <StatCard
-                label="การบ้านค้างส่ง"
-                value={pending}
-                note={`จากทั้งหมด ${total} งาน`}
-                tone="bg-olive-soft"
-                icon="◔"
-              />
-              <StatCard
-                label="ส่งพรุ่งนี้"
-                value={tomorrowCount}
-                note="ต้องรีบทำให้เสร็จ"
-                tone="bg-mustard-soft"
-                icon="▤"
-              />
-              <StatCard
-                label="รอระบุวันส่ง"
-                value={noDueCount}
-                note="พี่จินนี่รอคอยช่วย"
-                tone="bg-peach"
-                icon="!"
-              />
-              <StatCard
-                label="ทำเสร็จแล้ว"
-                value={done}
-                note="ยอดเยี่ยมมาก!"
-                tone="bg-mint"
-                icon="✓"
-              />
-            </section>
-
-            <section className="paper-card p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="font-mali text-[17px] font-bold">
-                    What do u want? (เมนูช่วย)
-                  </h2>
-                  <p className="text-[11.5px] text-ink-soft">
-                    เลือกสิ่งที่ต้องการทำ
-                  </p>
-                </div>
-                <span className="grid h-8 w-8 place-items-center rounded-full border-2 border-ink bg-mustard-soft">
-                  ✨
-                </span>
-              </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
-                {[
-                  {
-                    title: "Check dates",
-                    sub: "ดูตารางส่งการบ้าน",
-                    glyph: "📅",
-                    tone: "bg-mustard-soft",
-                  },
-                  {
-                    title: "Chat with P' genie",
-                    sub: "บอกพี่จินนี่ช่วยจดงาน",
-                    glyph: "💬",
-                    tone: "bg-mint",
-                  },
-                  {
-                    title: "Add new folder",
-                    sub: "สร้างโฟลเดอร์วิชาใหม่",
-                    glyph: "📁",
-                    tone: "bg-peach",
-                  },
-                ].map((w) => (
-                  <a
-                    key={w.title}
-                    href="#chat"
-                    className={`flex items-center gap-3 rounded-2xl border-2 border-ink ${w.tone} px-3 py-3 text-left transition hover:-translate-y-0.5`}
-                  >
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border-2 border-ink bg-[#fffdf6]">
-                      {w.glyph}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-semibold">
-                        {w.title}
-                      </span>
-                      <span className="block truncate text-[11px] text-ink-soft">
-                        {w.sub}
-                      </span>
-                    </span>
-                    <span className="text-ink-soft">›</span>
-                  </a>
-                ))}
-              </div>
-            </section>
-
-            <section className="paper-card p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <span className="grid h-9 w-9 place-items-center rounded-xl border-2 border-ink bg-mustard-soft">
-                    ▦
+        <div className="flex min-w-0 flex-1 items-start gap-5 px-4 py-5 sm:px-6">
+          <main className="min-w-0 flex-1 space-y-5">
+            <section className="surface soft-shadow relative overflow-hidden p-5 sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-soft px-3 py-1 text-[10.5px] font-semibold text-[#8a6410]">
+                    <IconSparkle size={12} />
+                    พร้อมช่วยจดการบ้านทุกวัน
                   </span>
-                  <div>
-                    <h2 className="font-mali text-[17px] font-bold">
-                      กำหนดการ (ตารางส่งงานสัปดาห์นี้)
-                    </h2>
-                    <p className="text-[11.5px] text-ink-soft">{todayLabel}</p>
-                  </div>
-                  <span className="rounded-full border border-ink/30 bg-peach px-2 py-0.5 text-[10.5px] font-semibold">
-                    ต้องส่ง {tomorrowCount} งาน
-                  </span>
-                </div>
-                <button className="rounded-full border-2 border-ink bg-[#fffdf6] px-3 py-1.5 text-[11.5px] font-semibold">
-                  + เพิ่มงานส่งวันนี้
-                </button>
-              </div>
+                  <h1 className="mt-3 text-[22px] font-bold leading-snug text-ink sm:text-[26px]">
+                    {pending === 0 ? (
+                      <>
+                        หวัดดีจ้า! ตอนนี้ยังไม่มีงานค้าง{" "}
+                        <span className="text-blue">ลุยเลย</span> ✨
+                      </>
+                    ) : (
+                      <>
+                        หวัดดีจ้า! วันนี้มีงานค้าง{" "}
+                        <span className="text-blue">{pending} อย่าง</span> น้า ✨
+                      </>
+                    )}
+                  </h1>
+                  <p className="mt-1 text-[12px] text-muted">{todayLabel}</p>
 
-              <div className="mt-4 grid grid-cols-7 gap-2">
-                {week.map((d) => {
-                  const dots = dotsFor(d.dueKey);
-                  return (
-                    <div
-                      key={`${d.day}-${d.label}`}
-                      className={`rounded-xl border-2 border-ink px-1 py-2 text-center ${
-                        d.active ? "bg-olive text-cream" : "bg-[#fffdf6] text-ink"
-                      }`}
-                    >
-                      <p className="text-[10.5px] opacity-80">{d.label}</p>
-                      <p className="font-mali text-[15px] font-bold">{d.day}</p>
-                      <div className="mt-0.5 flex justify-center gap-0.5">
-                        {Array.from({ length: dots }).map((_, i) => (
-                          <span
-                            key={i}
-                            className={`h-1 w-1 rounded-full ${
-                              d.active ? "bg-mustard" : "bg-[#e0a184]"
-                            }`}
-                          />
-                        ))}
-                      </div>
+                  <div className="mt-4 max-w-md">
+                    <div className="flex justify-between text-[11px] font-medium text-muted">
+                      <span>ความคืบหน้าการบ้านทั้งหมด</span>
+                      <span className="font-semibold text-navy">
+                        {done}/{total} งาน ({percent}%)
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-cream-deep">
+                      <div
+                        className="h-full rounded-full bg-blue transition-all"
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                  </div>
 
-              <p className="mt-4 flex items-center gap-2 text-[12px] font-semibold">
-                <span className="grid h-5 w-5 place-items-center rounded-full border border-ink text-[10px]">
-                  ◷
-                </span>
-                งานที่ต้องส่งพรุ่งนี้ (ไม่ระบุเวลา)
-              </p>
+                  <div className="mt-4 flex flex-wrap gap-2 text-[11px]">
+                    <span className="rounded-full bg-cream px-3 py-1 font-medium text-muted">
+                      ค้าง {pending}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setFilter({ kind: "due", key: "พรุ่งนี้" });
+                        setActiveNav("tasks");
+                        scrollTo("tasks");
+                      }}
+                      className="focus-ring rounded-full bg-cream px-3 py-1 font-medium text-muted transition hover:bg-yellow-soft"
+                    >
+                      ส่งพรุ่งนี้ {tomorrowTasks.length}
+                    </button>
+                    <span className="rounded-full bg-cream px-3 py-1 font-medium text-muted">
+                      เสร็จแล้ว {done}
+                    </span>
+                  </div>
+                </div>
 
-              <div className="mt-2 space-y-2">
-                {tomorrowTasks.length === 0 ? (
-                  <p className="rounded-xl border border-dashed border-ink/30 px-3 py-3 text-[11.5px] text-ink-soft">
-                    ยังไม่มีงานที่ต้องส่งพรุ่งนี้ พิมพ์ในแชทเพื่อเพิ่มได้เลย
-                  </p>
-                ) : (
-                  tomorrowTasks.map((t) => (
-                    <TaskRow key={t.id} task={t} onToggle={toggle} />
-                  ))
-                )}
+                <div className="hidden shrink-0 rounded-full bg-cream p-3 sm:block">
+                  <GenieFace size={92} />
+                </div>
               </div>
             </section>
 
-            <section className="paper-card p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-3">
-                  <span className="grid h-9 w-9 place-items-center rounded-xl border-2 border-ink bg-mint">
-                    ▥
-                  </span>
+            <section id="tasks" className="scroll-mt-24">
+              <div className="surface soft-shadow p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <h2 className="font-mali text-[17px] font-bold">
-                      สรุปความคืบหน้าการบ้าน (Task Analytics) ✨
+                    <h2 className="text-[17px] font-bold text-navy">
+                      การบ้านทั้งหมด
                     </h2>
-                    <p className="text-[11.5px] text-ink-soft">
+                    <p className="text-[11.5px] text-muted">
+                      แสดง {visibleTasks.length} จาก {total} งาน
+                    </p>
+                  </div>
+                  <button
+                    onClick={focusChat}
+                    className="focus-ring rounded-full border border-line px-3 py-1.5 text-[11.5px] font-semibold text-navy transition hover:border-blue hover:bg-blue-soft"
+                  >
+                    + เพิ่มการบ้าน
+                  </button>
+                </div>
+
+                {(activeFilterLabel || query) && (
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                    {activeFilterLabel && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-soft px-3 py-1 text-[11px] font-semibold text-navy">
+                        {activeFilterLabel}
+                        <button
+                          onClick={() => setFilter(null)}
+                          aria-label="ล้างตัวกรอง"
+                          className="focus-ring rounded-full hover:text-red"
+                        >
+                          <IconClose size={12} />
+                        </button>
+                      </span>
+                    )}
+                    {query && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-cream-deep px-3 py-1 text-[11px] font-semibold text-muted">
+                        ค้นหา: {query}
+                        <button
+                          onClick={() => setQuery("")}
+                          aria-label="ล้างคำค้นหา"
+                          className="focus-ring rounded-full hover:text-red"
+                        >
+                          <IconClose size={12} />
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-4 space-y-2">
+                  {!ready && (
+                    <p className="rounded-2xl border border-dashed border-line px-4 py-6 text-center text-[12px] text-muted">
+                      กำลังโหลดการบ้าน...
+                    </p>
+                  )}
+
+                  {ready && tasks.length === 0 && (
+                    <div className="rounded-2xl border border-dashed border-line px-4 py-8 text-center">
+                      <p className="text-[12.5px] text-muted">
+                        ยังไม่มีการบ้านเลย พิมพ์บอกพี่จินนี่ในช่องแชทได้เลย
+                      </p>
+                      <button
+                        onClick={focusChat}
+                        className="focus-ring mt-3 rounded-full bg-navy px-4 py-2 text-[11.5px] font-semibold text-paper hover:bg-navy-deep"
+                      >
+                        ไปที่ช่องแชท
+                      </button>
+                    </div>
+                  )}
+
+                  {ready && tasks.length > 0 && visibleTasks.length === 0 && (
+                    <div className="rounded-2xl border border-dashed border-line px-4 py-6 text-center">
+                      <p className="text-[12px] text-muted">
+                        ไม่พบงานที่ตรงกับตัวกรองนี้
+                      </p>
+                      <button
+                        onClick={() => {
+                          setFilter(null);
+                          setQuery("");
+                        }}
+                        className="focus-ring mt-2 rounded-full bg-cream-deep px-3 py-1.5 text-[11.5px] font-semibold text-navy"
+                      >
+                        ล้างตัวกรองทั้งหมด
+                      </button>
+                    </div>
+                  )}
+
+                  {visibleTasks.map((t) => (
+                    <TaskRow
+                      key={t.id}
+                      task={t}
+                      color={
+                        folderForSubject(t.subject, folders)?.color ??
+                        colorForName(t.subject, folders)
+                      }
+                      onToggle={toggle}
+                      onDelete={removeTask}
+                    />
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <div className="surface soft-shadow p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-[17px] font-bold text-navy">
+                      สรุปความคืบหน้า
+                    </h2>
+                    <p className="text-[11.5px] text-muted">
                       แยกตามโฟลเดอร์วิชา
                     </p>
                   </div>
-                </div>
-                <div className="flex gap-2 text-[11px]">
-                  <span className="rounded-full border border-ink/30 bg-mint px-2 py-0.5">
-                    เสร็จ {done}
-                  </span>
-                  <span className="rounded-full border border-ink/30 bg-mustard-soft px-2 py-0.5">
-                    ค้าง {pending}
-                  </span>
-                  <span className="rounded-full border border-ink/30 bg-[#fffdf6] px-2 py-0.5">
-                    ↝ {percent}%
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-5 space-y-3">
-                {FOLDER_SUBJECTS.map((s) => {
-                  const subjectTasks = tasks.filter((t) => t.subject === s.key);
-                  const width =
-                    subjectTasks.length === 0
-                      ? 0
-                      : Math.max(subjectTasks.length * 24, 6);
-                  return (
-                    <div key={s.key} className="flex items-center gap-3">
-                      <span className="w-16 text-right text-[11.5px] text-ink-soft">
-                        {s.short}
-                      </span>
-                      <div className="h-5 flex-1 overflow-hidden rounded-full border-2 border-ink bg-[#fffdf6]">
-                        <div
-                          className={`h-full ${s.card}`}
-                          style={{ width: `${width}%` }}
-                        />
-                      </div>
-                      <span className="w-6 text-[11.5px] font-semibold">
-                        {subjectTasks.length}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className="paper-card p-5">
-              <div className="flex items-center justify-between">
-                <h2 className="font-mali text-[17px] font-bold">
-                  การบ้านทั้งหมด ({total} งาน)
-                </h2>
-                <a href="#chat" className="text-[11.5px] font-semibold text-olive">
-                  + เพิ่มการบ้าน
-                </a>
-              </div>
-              <div className="mt-3 space-y-2.5">
-                {!ready && (
-                  <p className="rounded-xl border border-dashed border-ink/30 px-3 py-4 text-center text-[11.5px] text-ink-soft">
-                    กำลังโหลดการบ้าน...
-                  </p>
-                )}
-                {ready && tasks.length === 0 && (
-                  <p className="rounded-xl border border-dashed border-ink/30 px-3 py-4 text-center text-[11.5px] text-ink-soft">
-                    ยังไม่มีการบ้านเลย พิมพ์บอกพี่จินนี่ในช่องแชทได้เลย
-                  </p>
-                )}
-                {tasks.map((t) => (
-                  <TaskRow
-                    key={t.id}
-                    task={t}
-                    onToggle={toggle}
-                    onDelete={remove}
-                    wide
-                  />
-                ))}
-              </div>
-            </section>
-
-            <section className="paper-card p-5">
-              <div className="flex items-center justify-between">
-                <h2 className="font-mali text-[17px] font-bold">
-                  ไฟลเดอร์วิชา (3 วิชา)
-                </h2>
-                <button className="text-[11.5px] font-semibold text-olive">
-                  + เพิ่มวิชา
-                </button>
-              </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
-                {FOLDER_SUBJECTS.map((s) => (
-                  <div
-                    key={s.key}
-                    className={`rounded-2xl border-2 border-ink ${s.card} p-4`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <span className="grid h-9 w-9 place-items-center rounded-xl border-2 border-ink bg-[#fffdf6]">
-                        📁
-                      </span>
-                      <span className="grid h-6 w-6 place-items-center rounded-full border-2 border-ink bg-[#fffdf6] text-[11px] font-bold">
-                        {tasks.filter((t) => t.subject === s.key).length}
-                      </span>
-                    </div>
-                    <p className="mt-3 font-mali text-[15px] font-bold">
-                      {s.short}
-                    </p>
-                    <p className="text-[11.5px] text-ink-soft">{s.full}</p>
+                  <div className="flex gap-1.5 text-[10.5px]">
+                    <span className="rounded-full bg-green-soft px-2.5 py-1 font-semibold text-green">
+                      เสร็จ {done}
+                    </span>
+                    <span className="rounded-full bg-yellow-soft px-2.5 py-1 font-semibold text-[#8a6410]">
+                      ค้าง {pending}
+                    </span>
+                    <span className="rounded-full bg-cream px-2.5 py-1 font-semibold text-muted">
+                      {percent}%
+                    </span>
                   </div>
-                ))}
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {progressRows.length === 0 && (
+                    <p className="rounded-2xl border border-dashed border-line px-4 py-5 text-center text-[11.5px] text-muted">
+                      ยังไม่มีข้อมูลให้สรุป เพิ่มโฟลเดอร์หรือจดการบ้านก่อนน้า
+                    </p>
+                  )}
+
+                  {progressRows.map((row) => {
+                    const tone = toneFor(row.color);
+                    const fill =
+                      row.total === 0
+                        ? 0
+                        : Math.round((row.done / row.total) * 100);
+                    const folder = row.id
+                      ? folders.find((f) => f.id === row.id)
+                      : undefined;
+                    const inner = (
+                      <>
+                        <span className="w-20 shrink-0 truncate text-[11.5px] font-medium text-muted">
+                          {row.label}
+                        </span>
+                        <span className="h-4 flex-1 overflow-hidden rounded-full bg-cream-deep">
+                          <span
+                            className={`block h-full rounded-full ${tone.bar} transition-all`}
+                            style={{ width: `${fill}%` }}
+                          />
+                        </span>
+                        <span className="w-12 shrink-0 text-right text-[11px] font-semibold text-navy">
+                          {row.total}
+                        </span>
+                      </>
+                    );
+
+                    return folder ? (
+                      <button
+                        key={row.key}
+                        onClick={() => toggleFolderFilter(folder)}
+                        aria-pressed={
+                          filter?.kind === "folder" && filter.id === folder.id
+                        }
+                        className="focus-ring flex w-full items-center gap-3 rounded-xl px-1 py-1 text-left transition hover:bg-cream"
+                      >
+                        {inner}
+                      </button>
+                    ) : (
+                      <div
+                        key={row.key}
+                        className="flex w-full items-center gap-3 px-1 py-1"
+                      >
+                        {inner}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </section>
+
+            <section>
+              <div className="surface soft-shadow p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-[17px] font-bold text-navy">
+                      โฟลเดอร์วิชา ({folders.length})
+                    </h2>
+                    <p className="text-[11.5px] text-muted">
+                      กดที่โฟลเดอร์เพื่อดูการบ้านข้างใน
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setDialog({ mode: "create" })}
+                    className="focus-ring flex items-center gap-1 rounded-full bg-blue-soft px-3 py-1.5 text-[11.5px] font-semibold text-navy transition hover:bg-blue"
+                  >
+                    <IconPlus size={13} />
+                    เพิ่มโฟลเดอร์
+                  </button>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {folders.map((folder) => {
+                    const tone = toneFor(folder.color);
+                    const folderCount = counts[folder.name] ?? 0;
+                    return (
+                      <div
+                        key={folder.id}
+                        className={`relative rounded-2xl ${tone.soft} p-4 transition hover:-translate-y-0.5`}
+                      >
+                        <button
+                          onClick={() => toggleFolderFilter(folder)}
+                          aria-label={`ดูการบ้านในโฟลเดอร์ ${folder.name}`}
+                          className="focus-ring absolute inset-0 rounded-2xl"
+                        />
+                        <div className="pointer-events-none relative">
+                          <div className="flex items-start justify-between">
+                            <CatFolderIcon size={38} />
+                            <span className="grid h-6 min-w-6 place-items-center rounded-full bg-paper px-1 text-[11px] font-bold text-navy">
+                              {folderCount}
+                            </span>
+                          </div>
+                          <p className="mt-3 truncate text-[14px] font-bold text-navy">
+                            {folder.name}
+                          </p>
+                          <p className="text-[10.5px] text-navy/60">
+                            {folderCount} งาน
+                          </p>
+                        </div>
+                        <div className="absolute right-2.5 top-2.5 z-10 flex gap-0.5">
+                          <button
+                            onClick={() => setDialog({ mode: "edit", folder })}
+                            aria-label={`แก้ไขโฟลเดอร์ ${folder.name}`}
+                            className="focus-ring grid h-7 w-7 place-items-center rounded-full bg-paper/80 text-muted transition hover:text-navy"
+                          >
+                            <IconPencil size={13} />
+                          </button>
+                          <button
+                            onClick={() => removeFolder(folder)}
+                            aria-label={`ลบโฟลเดอร์ ${folder.name}`}
+                            className="focus-ring grid h-7 w-7 place-items-center rounded-full bg-paper/80 text-muted transition hover:text-red"
+                          >
+                            <IconTrash size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <button
+                    onClick={() => setDialog({ mode: "create" })}
+                    className="focus-ring flex min-h-[132px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line text-muted transition hover:border-blue hover:text-blue"
+                  >
+                    <IconPlus size={20} />
+                    <span className="text-[11.5px] font-semibold">
+                      เพิ่มโฟลเดอร์วิชา
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section id="reminder" className="scroll-mt-24">
+              <div className="surface soft-shadow p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-[17px] font-bold text-navy">
+                      กำหนดการสัปดาห์นี้
+                    </h2>
+                    <p className="text-[11.5px] text-muted">{todayLabel}</p>
+                  </div>
+                  <span className="rounded-full bg-red-soft px-3 py-1 text-[10.5px] font-semibold text-red">
+                    ส่งพรุ่งนี้ {tomorrowTasks.length} งาน
+                  </span>
+                </div>
+
+                <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-7">
+                  {week.map((d) => {
+                    const dots = Math.min(
+                      tasks.filter(
+                        (t) => !t.done && dueMatches(t.due, d.dueKey),
+                      ).length,
+                      3,
+                    );
+                    const active =
+                      filter?.kind === "due" && filter.key === d.dueKey;
+                    return (
+                      <button
+                        key={`${d.day}-${d.label}`}
+                        onClick={() =>
+                          setFilter(
+                            active ? null : { kind: "due", key: d.dueKey },
+                          )
+                        }
+                        aria-pressed={active}
+                        className={`focus-ring rounded-xl px-1 py-2 text-center transition ${
+                          active
+                            ? "bg-navy text-paper"
+                            : "bg-cream text-ink hover:bg-cream-deep"
+                        }`}
+                      >
+                        <span className="block text-[10px] opacity-70">
+                          {d.label}
+                        </span>
+                        <span className="block font-mali text-[15px] font-bold">
+                          {d.day}
+                        </span>
+                        <span className="mt-0.5 flex justify-center gap-0.5">
+                          {Array.from({ length: dots }).map((_, i) => (
+                            <span
+                              key={i}
+                              className={`h-1 w-1 rounded-full ${
+                                active ? "bg-yellow" : "bg-blue"
+                              }`}
+                            />
+                          ))}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <p className="mt-4 text-[12px] font-semibold text-navy">
+                  งานที่ต้องส่งเร็ว ๆ นี้
+                </p>
+                <div className="mt-2 space-y-2">
+                  {!ready && (
+                    <p className="rounded-2xl border border-dashed border-line px-4 py-4 text-center text-[11.5px] text-muted">
+                      กำลังโหลด...
+                    </p>
+                  )}
+                  {ready && urgentTasks.length === 0 && (
+                    <p className="rounded-2xl border border-dashed border-line px-4 py-4 text-center text-[11.5px] text-muted">
+                      ยังไม่มีงานที่ต้องส่งวันนี้หรือพรุ่งนี้ พิมพ์ในแชทเพื่อเพิ่มได้เลย
+                    </p>
+                  )}
+                  {urgentTasks.map((t) => (
+                    <TaskRow
+                      key={t.id}
+                      task={t}
+                      color={
+                        folderForSubject(t.subject, folders)?.color ??
+                        colorForName(t.subject, folders)
+                      }
+                      onToggle={toggle}
+                      onDelete={removeTask}
+                    />
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {!wide && (
+              <section id="chat" className="scroll-mt-24">
+                <div className="surface soft-shadow flex flex-col p-4">
+                  {chatPanel}
+                </div>
+              </section>
+            )}
           </main>
 
-          <aside className="sticky top-[65px] hidden h-[calc(100vh-65px)] w-[360px] shrink-0 flex-col border-l-2 border-ink bg-[#fdf8ec] p-4 xl:flex">
-            <ChatPanel {...chatProps} />
-          </aside>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  note,
-  tone,
-  icon,
-}: {
-  label: string;
-  value: number;
-  note: string;
-  tone: string;
-  icon: string;
-}) {
-  return (
-    <div className="paper-card p-4">
-      <div className="flex items-start justify-between">
-        <p className="text-[12px] font-semibold text-ink-soft">{label}</p>
-        <span
-          className={`grid h-7 w-7 place-items-center rounded-lg border-2 border-ink/60 ${tone} text-[11px]`}
-        >
-          {icon}
-        </span>
-      </div>
-      <p className="mt-1 font-mali text-[30px] font-bold leading-none">{value}</p>
-      <p className="mt-1 text-[11px] text-ink-soft">{note}</p>
-    </div>
-  );
-}
-
-function TaskRow({
-  task,
-  onToggle,
-  onDelete,
-  wide = false,
-}: {
-  task: Task;
-  onToggle: (id: string) => void;
-  onDelete?: (id: string) => void;
-  wide?: boolean;
-}) {
-  const subject = SUBJECTS[task.subject];
-  return (
-    <div className="flex items-center gap-3 rounded-xl border-2 border-ink bg-[#fffdf6] px-3 py-2.5">
-      <button
-        onClick={() => onToggle(task.id)}
-        aria-label={
-          task.done ? "ทำเครื่องหมายว่ายังไม่เสร็จ" : "ทำเครื่องหมายว่าเสร็จแล้ว"
-        }
-        className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border-2 border-ink text-[11px] ${
-          task.done ? "bg-olive text-cream" : "bg-[#fffdf6]"
-        }`}
-      >
-        {task.done ? "✓" : ""}
-      </button>
-      <div className="min-w-0 flex-1">
-        <p
-          className={`truncate text-[12.5px] font-medium ${
-            task.done ? "text-ink-soft line-through" : ""
-          }`}
-        >
-          {task.title}
-        </p>
-        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10.5px]">
-          <span
-            className={`rounded-md border border-ink/30 px-2 py-0.5 font-semibold ${subject.chip} ${subject.text}`}
-          >
-            {subject.short}
-          </span>
-          <span className="rounded-md border border-ink/20 bg-[#fffdf6] px-2 py-0.5 text-ink-soft">
-            ▤ {task.due}
-          </span>
-          {task.urgent && (
-            <span className="rounded-md bg-peach px-2 py-0.5 text-[#a3452a]">
-              ⏱ ด่วน
-            </span>
+          {wide && (
+            <aside className="sticky top-[76px] max-h-[calc(100vh-96px)] w-[360px] shrink-0">
+              <div
+                id="chat"
+                className="surface soft-shadow scroll-mt-24 flex h-[calc(100vh-100px)] flex-col p-4"
+              >
+                {chatPanel}
+              </div>
+            </aside>
           )}
         </div>
       </div>
-      {wide && (
-        <button
-          onClick={() => {
-            if (!onDelete) return;
-            if (window.confirm("ลบการบ้านนี้ออกใช่ไหม?")) onDelete(task.id);
-          }}
-          aria-label="ลบการบ้าน"
-          className="shrink-0 text-ink-soft hover:text-red"
-        >
-          🗑
-        </button>
+
+      {dialog && (
+        <FolderDialog
+          mode={dialog.mode}
+          initialName={dialog.mode === "edit" ? dialog.folder.name : ""}
+          initialColor={dialog.mode === "edit" ? dialog.folder.color : undefined}
+          existingNames={folders.map((f) => f.name)}
+          onClose={() => setDialog(null)}
+          onSave={saveFolder}
+        />
+      )}
+
+      {toast && (
+        <div className="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-navy px-5 py-2.5 text-[12px] font-medium text-paper shadow-lg">
+          {toast}
+        </div>
       )}
     </div>
   );
