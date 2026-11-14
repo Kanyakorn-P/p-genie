@@ -40,6 +40,7 @@ import {
 import { askGenie } from "@/lib/genie-ai";
 import { ChatPanel, type ChatMessage } from "./ChatPanel";
 import { AccountAvatar } from "./AccountAvatar";
+import { CalendarView } from "./CalendarView";
 import { FolderDialog } from "./FolderDialog";
 import { GenieFace } from "./GenieFace";
 import { LoginPanel } from "./LoginPanel";
@@ -528,6 +529,13 @@ export function GenieApp() {
     return subjects[cleaned] ?? null;
   }
 
+  function isTodayQuestion(text: string) {
+    return (
+      /วันนี้/.test(text) &&
+      /(มีอะไร|ต้องส่ง|ส่งอะไร|การบ้าน|งาน)/.test(text)
+    );
+  }
+
   // สร้างโฟลเดอร์ให้วิชาที่ยังไม่มี (เช่นพิมพ์ "ฟิ" ก็ได้โฟลเดอร์ "ฟิสิกส์" เอง)
   function ensureFolders(names: string[]): {
     canonical: Map<string, string>;
@@ -600,6 +608,31 @@ export function GenieApp() {
             ? `ลบโฟลเดอร์ "${deleteTarget.name}" ให้แล้วนะ การบ้านข้างในยังอยู่ ไม่ได้ลบตาม`
             : "โอเค ยังไม่ลบโฟลเดอร์นะ",
         },
+      ]);
+      return;
+    }
+
+    // คำถามค้นงานวันนี้ต้องอ่านจากงานจริง ห้ามส่งเข้า AI ให้สร้างงานหรือโฟลเดอร์
+    if (isTodayQuestion(text)) {
+      const todayDay = `วัน${FULL_DAYS[new Date().getDay()]}`;
+      const dueToday = tasks.filter(
+        (task) =>
+          !task.done &&
+          (dueMatches(task.due, "วันนี้") || dueMatches(task.due, todayDay)),
+      );
+      const answer =
+        dueToday.length > 0
+          ? `วันนี้มี ${dueToday.length} งานที่ต้องส่งน้า\n${dueToday
+              .map(
+                (task) =>
+                  `• ${subjectLabel(task.subject)}: ${task.title} (${task.due})`,
+              )
+              .join("\n")}`
+          : "วันนี้ยังไม่มีการบ้านที่ต้องส่งน้า พักหายใจได้เลย ✨";
+
+      setMessages((prev) => [
+        ...prev,
+        { id: uid(), role: "genie", text: answer },
       ]);
       return;
     }
@@ -1271,6 +1304,8 @@ export function GenieApp() {
                 </div>
               </div>
             </section>
+
+            <CalendarView tasks={tasks} />
 
             <section id="reminder" className="scroll-mt-24">
               <div className="surface soft-shadow p-5">
