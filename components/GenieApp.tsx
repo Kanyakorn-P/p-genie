@@ -286,7 +286,6 @@ export function GenieApp() {
   const [pendingDueTaskIds, setPendingDueTaskIds] = useState<string[]>([]);
   const [contactOpen, setContactOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
-  const [aiModeOpen, setAiModeOpen] = useState(false);
   const [onboarding, setOnboarding] = useState<"ask" | "guide" | null>("ask");
   const [onboardingStep, setOnboardingStep] = useState(0);
   const onboardingDismissed = useSyncExternalStore(
@@ -1081,6 +1080,8 @@ export function GenieApp() {
       onChip={setInput}
       inputRef={chatInputRef}
       messagesClassName={wide ? "flex-1" : "h-[300px]"}
+      aiMode={aiMode}
+      onAiModeChange={changeAiMode}
     />
   );
 
@@ -1140,70 +1141,6 @@ export function GenieApp() {
           </label>
 
           <div className="ml-auto flex items-center gap-2">
-            <div className="relative">
-              <button
-                onClick={() => setAiModeOpen((open) => !open)}
-                aria-label="เลือกโหมด AI"
-                aria-expanded={aiModeOpen}
-                className="focus-ring rounded-full border border-line bg-paper px-3 py-2 text-[11px] font-bold text-navy transition hover:border-blue"
-              >
-                AI
-              </button>
-              {aiModeOpen && (
-                <>
-                  <button
-                    aria-label="ปิดเมนูโหมด AI"
-                    onClick={() => setAiModeOpen(false)}
-                    className="fixed inset-0 z-20 cursor-default"
-                  />
-                  <div className="soft-shadow absolute right-0 top-11 z-30 w-[220px] rounded-2xl border border-line bg-paper p-3">
-                    <p className="text-[12px] font-bold text-navy">โหมด AI</p>
-                    <p className="mt-1 text-[10.5px] leading-relaxed text-muted">
-                      ค่าเริ่มต้นเป็นโหมดประหยัด เปลี่ยนได้ทุกเมื่อ
-                    </p>
-                    <div className="mt-3 space-y-1.5">
-                      {[
-                        {
-                          mode: "economy" as AiMode,
-                          title: "ประหยัด",
-                          detail: "เร็วและใช้โควตาน้อย",
-                        },
-                        {
-                          mode: "balanced" as AiMode,
-                          title: "สมดุล",
-                          detail: "เข้าใจข้อความซับซ้อนขึ้น",
-                        },
-                      ].map((option) => (
-                        <button
-                          key={option.mode}
-                          onClick={() => {
-                            changeAiMode(option.mode);
-                            setAiModeOpen(false);
-                          }}
-                          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition ${
-                            aiMode === option.mode
-                              ? "bg-blue-soft text-navy"
-                              : "bg-cream text-ink hover:bg-cream-deep"
-                          }`}
-                        >
-                          <span>
-                            <span className="block text-[11px] font-semibold">
-                              {option.title}
-                            </span>
-                            <span className="block text-[9.5px] text-muted">
-                              {option.detail}
-                            </span>
-                          </span>
-                          {aiMode === option.mode && (
-                            <span className="text-[12px]">✓</span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
             <button
               onClick={() => setDarkMode((enabled) => !enabled)}
               aria-label={darkMode ? "เปลี่ยนเป็นโหมดสว่าง" : "เปลี่ยนเป็นโหมดมืด"}
