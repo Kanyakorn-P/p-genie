@@ -1083,7 +1083,7 @@ export function GenieApp() {
             </div>
           </button>
 
-          <label className="order-3 flex min-w-0 flex-1 items-center gap-2 rounded-full border border-line bg-paper px-4 py-2 transition focus-within:border-blue sm:order-none">
+          <label className="order-3 flex basis-full min-w-0 flex-1 items-center gap-2 rounded-full border border-line bg-paper px-4 py-2 transition focus-within:border-blue sm:order-none sm:basis-auto">
             <IconSearch size={16} className="shrink-0 text-muted" />
             <input
               value={query}
@@ -1113,7 +1113,7 @@ export function GenieApp() {
             </button>
             <button
               onClick={focusChat}
-              className="focus-ring flex items-center gap-1.5 rounded-full bg-navy px-3.5 py-2 text-[12px] font-semibold text-paper transition hover:bg-navy-deep"
+              className="focus-ring hidden items-center gap-1.5 rounded-full bg-navy px-3.5 py-2 text-[12px] font-semibold text-paper transition hover:bg-navy-deep sm:flex"
             >
               <IconPlus size={14} />
               เพิ่มการบ้าน
@@ -1141,7 +1141,7 @@ export function GenieApp() {
                     onClick={() => setPop(null)}
                     aria-hidden="true"
                   />
-                  <div className="soft-shadow absolute right-0 top-11 z-30 w-[280px] rounded-2xl border border-line bg-paper p-3">
+                  <div className="soft-shadow fixed left-3 right-3 top-16 z-30 max-h-[calc(100dvh-6rem)] w-auto overflow-y-auto rounded-2xl border border-line bg-paper p-3 sm:absolute sm:left-auto sm:right-0 sm:top-11 sm:w-[280px]">
                     <p className="px-1 text-[12px] font-semibold text-navy">
                       ใกล้ถึงกำหนด
                     </p>
