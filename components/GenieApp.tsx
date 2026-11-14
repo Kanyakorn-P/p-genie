@@ -156,6 +156,59 @@ function dueMatches(due: string, key: string) {
   return due.includes(key);
 }
 
+function dueSortRank(due: string): number {
+  if (due.includes("วันนี้")) return 0;
+  if (due.includes("พรุ่งนี้")) return 1;
+  if (due.includes("มะรืน")) return 2;
+  if (due.includes("สัปดาห์หน้า")) return 7;
+
+  const weekdays = [
+    "อาทิตย์",
+    "จันทร์",
+    "อังคาร",
+    "พุธ",
+    "พฤหัสบดี",
+    "ศุกร์",
+    "เสาร์",
+  ];
+  const day = weekdays.findIndex((name) => due.includes(`วัน${name}`));
+  if (day >= 0) {
+    const today = new Date().getDay();
+    let delta = (day - today + 7) % 7;
+    if (due.includes("หน้า")) delta += 7;
+    return delta || 0;
+  }
+
+  const monthNames = [
+    "ม.ค.",
+    "ก.พ.",
+    "มี.ค.",
+    "เม.ย.",
+    "พ.ค.",
+    "มิ.ย.",
+    "ก.ค.",
+    "ส.ค.",
+    "ก.ย.",
+    "ต.ค.",
+    "พ.ย.",
+    "ธ.ค.",
+  ];
+  const date = due.match(/(\d{1,2})\s*(ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.)/);
+  if (date) {
+    const month = monthNames.indexOf(date[2]);
+    const target = new Date(new Date().getFullYear(), month, Number(date[1]));
+    const today = new Date();
+    return Math.max(
+      0,
+      Math.ceil((target.getTime() - today.getTime()) / 86400000),
+    );
+  }
+
+  const numberOfDays = due.match(/อีก\s*(\d+)\s*วัน/);
+  if (numberOfDays) return Number(numberOfDays[1]);
+  return 100000;
+}
+
 export function GenieApp() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -337,7 +390,8 @@ export function GenieApp() {
 
   const visibleTasks = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return tasks.filter((t) => {
+    return tasks
+      .filter((t) => {
       if (filter?.kind === "folder") {
         const folder = folderForSubject(t.subject, folders);
         if (folder?.id !== filter.id) return false;
@@ -347,7 +401,14 @@ export function GenieApp() {
       return `${t.title} ${subjectLabel(t.subject)} ${t.due}`
         .toLowerCase()
         .includes(q);
-    });
+      })
+      .sort((a, b) => {
+        const dueOrder = dueSortRank(a.due) - dueSortRank(b.due);
+        if (dueOrder !== 0) return dueOrder;
+        const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return aCreated - bCreated;
+      });
   }, [tasks, filter, query, folders]);
   const taskPageCount = Math.max(1, Math.ceil(visibleTasks.length / 5));
   const currentTaskPage = Math.min(taskPage, taskPageCount);
@@ -828,6 +889,7 @@ export function GenieApp() {
       title: p.title,
       subject: p.subject,
       due: p.due,
+      createdAt: Date.now(),
       urgent: p.urgent,
       done: false,
     }));

@@ -186,7 +186,7 @@ export async function listTasks(): Promise<Task[]> {
 
   const { data, error } = await supabase
     .from("tasks")
-    .select("id,title,subject,due,urgent,done")
+    .select("id,title,subject,due,urgent,done,created_at")
     .order("created_at", { ascending: false });
 
   if (error || !data) return readLocal();
@@ -196,6 +196,7 @@ export async function listTasks(): Promise<Task[]> {
     title: String(row.title),
     subject: String(row.subject),
     due: String(row.due),
+    createdAt: String(row.created_at),
     urgent: Boolean(row.urgent),
     done: Boolean(row.done),
   }));

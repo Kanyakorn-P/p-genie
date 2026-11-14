@@ -3,6 +3,7 @@ export type Task = {
   title: string;
   subject: string;
   due: string;
+  createdAt?: string | number;
   urgent?: boolean;
   done: boolean;
 };
