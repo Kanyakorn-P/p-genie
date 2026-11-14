@@ -1108,13 +1108,9 @@ export function GenieApp() {
           </div>
         </header>
 
-        <div className="flex min-w-0 flex-1 items-start gap-5 px-4 py-5 sm:px-6">
+        <div className="content-pattern flex min-w-0 flex-1 items-start gap-5 px-4 py-5 sm:px-6">
           <main className="flex min-w-0 flex-1 flex-col space-y-5">
             <section className="order-0 surface soft-shadow relative overflow-hidden p-5 sm:p-6">
-              <div
-                aria-hidden="true"
-                className="hero-dots pointer-events-none absolute inset-y-0 right-0 hidden w-40 sm:block"
-              />
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-soft px-3 py-1 text-[10.5px] font-semibold text-[#8a6410]">
