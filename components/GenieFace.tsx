@@ -17,7 +17,7 @@ export function GenieFace({ size = 40 }: { size?: number }) {
       />
       <path
         d="M11 24c0-11 9-17 21-17s21 6 21 17"
-        fill="#F5C542"
+        fill="var(--color-yellow-soft)"
         stroke="#1E2733"
         strokeWidth="2.5"
         strokeLinejoin="round"
@@ -28,7 +28,7 @@ export function GenieFace({ size = 40 }: { size?: number }) {
         width="46"
         height="8"
         rx="4"
-        fill="#E4B02C"
+        fill="var(--color-yellow)"
         stroke="#1E2733"
         strokeWidth="2.5"
       />
