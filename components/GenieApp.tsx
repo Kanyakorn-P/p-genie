@@ -458,11 +458,11 @@ export function GenieApp() {
     setDialog(null);
   }
 
-  function removeFolder(folder: Folder) {
+  function removeFolder(folder: Folder): boolean {
     const ok = window.confirm(
       `ลบโฟลเดอร์ "${folder.name}" ใช่ไหม?\nการบ้านในโฟลเดอร์นี้ยังอยู่ ไม่ถูกลบ`,
     );
-    if (!ok) return;
+    if (!ok) return false;
 
     setFolders((prev) => prev.filter((f) => f.id !== folder.id));
     if (filter?.kind === "folder" && filter.id === folder.id) {
@@ -470,6 +470,29 @@ export function GenieApp() {
     }
     void deleteFolderRow(folder.id);
     flash(`ลบโฟลเดอร์ "${folder.name}" แล้ว`);
+    return true;
+  }
+
+  function folderDeleteTarget(text: string): Folder | null | undefined {
+    const match = text.match(
+      /^\s*(?:พี่ๆ?\s*)?(?:ช่วย\s*)?(?:เอาโฟลเดอร์ออก|ลบออก|เอาออก|ลบ)\s*(?:โฟลเดอร์\s*)?(.+?)\s*[นะน้าา.!?]*\s*$/i,
+    );
+    if (!match) return undefined;
+
+    const requested = match[1]
+      .replace(/^โฟลเดอร์\s*/i, "")
+      .replace(/[“”"'`]/g, "")
+      .trim();
+    if (!requested) return null;
+
+    return (
+      folders.find((folder) => folder.name === requested) ??
+      folders.find(
+        (folder) =>
+          folder.name.includes(requested) || requested.includes(folder.name),
+      ) ??
+      null
+    );
   }
 
   // สร้างโฟลเดอร์ให้วิชาที่ยังไม่มี (เช่นพิมพ์ "ฟิ" ก็ได้โฟลเดอร์ "ฟิสิกส์" เอง)
@@ -518,6 +541,36 @@ export function GenieApp() {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setActiveNav("chat");
+
+    // คำสั่งลบโฟลเดอร์ต้องทำเป็น action ก่อน ไม่ส่งเข้า Gemini ให้กลายเป็นการบ้าน
+    const deleteTarget = folderDeleteTarget(text);
+    if (deleteTarget !== undefined) {
+      if (!deleteTarget) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: uid(),
+            role: "genie",
+            text: "ยังหาโฟลเดอร์นี้ไม่เจอน้า ลองพิมพ์ชื่อโฟลเดอร์ให้ตรงอีกนิด",
+          },
+        ]);
+        return;
+      }
+
+      const deleted = removeFolder(deleteTarget);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uid(),
+          role: "genie",
+          text: deleted
+            ? `ลบโฟลเดอร์ "${deleteTarget.name}" ให้แล้วนะ การบ้านข้างในยังอยู่ ไม่ได้ลบตาม`
+            : "โอเค ยังไม่ลบโฟลเดอร์นะ",
+        },
+      ]);
+      return;
+    }
+
     setThinking(true);
 
     const ai = await askGenie(
