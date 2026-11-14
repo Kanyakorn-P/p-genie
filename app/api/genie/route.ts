@@ -86,6 +86,7 @@ Rules:
 - title: what the homework is, short and clear, keep important details (page, chapter, exercise numbers).
 - subject: pick the school subject. Use the full Thai name, never an abbreviation: คณิต, ไทย, อังกฤษ, วิทยาศาสตร์, ฟิสิกส์, เคมี, ชีววิทยา, สังคม, อื่นๆ. Prefer one of the student's folders when it fits.
 - Understand Thai school slang: ฟิ or ฟิสิกส์ = ฟิสิกส์, เลข or คณิต = คณิต, ชีวะ or ชีวะวิทยา = ชีววิทยา, อิ๊ง or อังกฤษ = อังกฤษ, วิทย์ = วิทยาศาสตร์, สังคมศึกษา = สังคม, ไทย = ไทย, เคมี = เคมี.
+- Understand topic clues: เซล or เซลล์ means ชีววิทยา, even when the student says วิทย์. For example, งานวิทย์เรื่องเซลล์ must go to ชีววิทยา.
 - due: copy the deadline wording from the message (วันนี้, พรุ่งนี้, มะรืนนี้, วันศุกร์, สัปดาห์หน้า, 12 ม.ค. ...). If there is no deadline, use "ยังไม่ระบุวันส่ง".
 - urgent: true only when due is วันนี้, พรุ่งนี้ or มะรืนนี้.
 - folders: list of folder names that should exist in the app. Always include the subject of every task you return. If the student asks to organise or separate their homework into folders, add those folder names too. If the student mentions a folder that is not in their current list, add it. Use the same full Thai subject names. Never repeat a name that is already in the student's folder list.
@@ -136,10 +137,16 @@ function cleanTask(raw: unknown): GenieTask | null {
   const t = raw as Record<string, unknown>;
   const title = typeof t.title === "string" ? t.title.trim() : "";
   if (!title) return null;
-  const subject =
+  let subject =
     typeof t.subject === "string" && t.subject.trim()
       ? normalizeSubjectName(t.subject.trim())
       : "อื่นๆ";
+  if (
+    subject === "วิทยาศาสตร์" &&
+    /เซล(?:ล์)?/.test(title)
+  ) {
+    subject = "ชีววิทยา";
+  }
   const due =
     typeof t.due === "string" && t.due.trim()
       ? t.due.trim()

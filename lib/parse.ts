@@ -8,7 +8,7 @@ export type ParsedTask = {
 };
 
 const SUBJECT_REGEX =
-  /(ฟิสิกส์|ฟิ|ภาษาไทย|ไทย|คณิตศาสตร์|คณิต|เลข|สังคมศึกษา|สังคม|ภาษาอังกฤษ|อังกฤษ|อิ๊ง|ชีววิทยา|ชีวะ|วิทยาศาสตร์|วิทย์|เคมี)/g;
+  /(ฟิสิกส์|ฟิ|ภาษาไทย|ไทย|คณิตศาสตร์|คณิต|เลข|สังคมศึกษา|สังคม|ภาษาอังกฤษ|อังกฤษ|อิ๊ง|ชีววิทยา|ชีวะ|วิทยาศาสตร์|วิทย์|เคมี|เซลล์|เซล)/g;
 
 function toSubject(word: string): string {
   if (word.startsWith("ฟิ")) return "ฟิสิกส์";
@@ -18,6 +18,7 @@ function toSubject(word: string): string {
   if (word.includes("สังคม")) return "สังคม";
   if (word.startsWith("ชีว")) return "ชีววิทยา";
   if (word.startsWith("วิทย")) return "วิทยาศาสตร์";
+  if (word.startsWith("เซล")) return "ชีววิทยา";
   if (word.includes("เคมี")) return "เคมี";
   return NO_SUBJECT;
 }
