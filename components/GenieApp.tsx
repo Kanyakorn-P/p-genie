@@ -37,6 +37,7 @@ import {
   toAccountUser,
   type AccountUser,
 } from "@/lib/supabase";
+import { askGenie } from "@/lib/genie-ai";
 import { ChatPanel, type ChatMessage } from "./ChatPanel";
 import { AccountAvatar } from "./AccountAvatar";
 import { FolderDialog } from "./FolderDialog";
@@ -171,6 +172,7 @@ export function GenieApp() {
   const [roomCode, setRoomCode] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [user, setUser] = useState<AccountUser | null>(null);
+  const [thinking, setThinking] = useState(false);
 
   const chatInputRef = useRef<HTMLInputElement>(null);
   const mounted = useMounted();
@@ -470,24 +472,38 @@ export function GenieApp() {
     flash(`ลบโฟลเดอร์ "${folder.name}" แล้ว`);
   }
 
-  function send() {
+  async function send() {
     const text = input.trim();
-    if (!text) return;
+    if (!text || thinking) return;
 
-    const parsed = parseTasks(text);
     const userMessage: ChatMessage = { id: uid(), role: "user", text };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setActiveNav("chat");
+    setThinking(true);
+
+    const ai = await askGenie(
+      text,
+      folders.map((f) => f.name),
+    );
+
+    setThinking(false);
+
+    const parsed = ai && ai.tasks.length > 0 ? ai.tasks : parseTasks(text);
+    const aiReply = ai && ai.tasks.length > 0 ? ai.reply : "";
 
     if (parsed.length === 0) {
       setMessages((prev) => [
         ...prev,
-        userMessage,
         {
           id: uid(),
           role: "genie",
-          text: "ยังไม่เห็นการบ้านเลย ลองพิมพ์อีกทีนะ เช่น ฟิสิกส์หน้า 45 ส่งพรุ่งนี้",
+          text:
+            ai?.reply ||
+            "ยังไม่เห็นการบ้านเลย ลองพิมพ์อีกทีนะ เช่น ฟิสิกส์หน้า 45 ส่งพรุ่งนี้",
         },
       ]);
-      setInput("");
       return;
     }
 
@@ -509,15 +525,12 @@ export function GenieApp() {
 
     setMessages((prev) => [
       ...prev,
-      userMessage,
       {
         id: uid(),
         role: "genie",
-        text: `จดให้แล้ว ${parsed.length} งานน้า ✨\n${list}\nถ้าอยากแยกเป็นโฟลเดอร์วิชา บอกพี่จินนี่ได้เลย`,
+        text: `${aiReply ? `${aiReply}\n` : `จดให้แล้ว ${parsed.length} งานน้า ✨\n`}${list}\nถ้าอยากแยกเป็นโฟลเดอร์วิชา บอกพี่จินนี่ได้เลย`,
       },
     ]);
-    setInput("");
-    setActiveNav("chat");
   }
 
   function toggleFolderFilter(folder: Folder) {
@@ -587,6 +600,7 @@ export function GenieApp() {
       input={input}
       onInput={setInput}
       onSend={send}
+      thinking={thinking}
       chips={CHIPS}
       onChip={setInput}
       inputRef={chatInputRef}

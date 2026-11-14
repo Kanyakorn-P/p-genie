@@ -15,6 +15,7 @@ type ChatPanelProps = {
   input: string;
   onInput: (value: string) => void;
   onSend: () => void;
+  thinking?: boolean;
   chips: string[];
   onChip: (value: string) => void;
   inputRef?: RefObject<HTMLInputElement | null>;
@@ -26,6 +27,7 @@ export function ChatPanel({
   input,
   onInput,
   onSend,
+  thinking = false,
   chips,
   onChip,
   inputRef,
@@ -70,6 +72,26 @@ export function ChatPanel({
             </div>
           ),
         )}
+        {thinking && (
+          <div className="flex justify-start">
+            <div className="flex items-center gap-1 rounded-2xl rounded-tl-md bg-cream px-3.5 py-2.5 text-muted">
+              <span className="animate-pulse">●</span>
+              <span
+                className="animate-pulse"
+                style={{ animationDelay: "0.15s" }}
+              >
+                ●
+              </span>
+              <span
+                className="animate-pulse"
+                style={{ animationDelay: "0.3s" }}
+              >
+                ●
+              </span>
+              <span className="ml-1 text-[11px]">พี่จินนี่กำลังคิด...</span>
+            </div>
+          </div>
+        )}
         <div ref={endRef} />
       </div>
 
@@ -103,7 +125,8 @@ export function ChatPanel({
         <button
           type="submit"
           aria-label="ส่งข้อความ"
-          className="focus-ring grid h-9 w-9 shrink-0 place-items-center rounded-full bg-navy text-paper transition hover:bg-navy-deep"
+          disabled={thinking}
+          className="focus-ring grid h-9 w-9 shrink-0 place-items-center rounded-full bg-navy text-paper transition hover:bg-navy-deep disabled:opacity-50"
         >
           <IconSend size={16} />
         </button>
