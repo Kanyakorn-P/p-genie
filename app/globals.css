@@ -64,6 +64,17 @@
     outline-offset: 2px;
   }
 
+  .hero-dots {
+    background-color: var(--color-yellow-soft);
+    background-image: radial-gradient(
+      circle,
+      rgba(103, 99, 89, 0.42) 2px,
+      transparent 2.5px
+    );
+    background-size: 16px 16px;
+    mask-image: linear-gradient(90deg, transparent 0%, black 30%);
+  }
+
 }
 
 /* แถบเลื่อนบาง ๆ ให้เข้ากับพื้นครีม */
