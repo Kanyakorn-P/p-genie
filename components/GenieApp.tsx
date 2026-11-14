@@ -244,6 +244,50 @@ export function GenieApp() {
     };
   }, [userId]);
 
+  // ถ้าล็อกอินไม่สำเร็จ Supabase จะเด้งกลับมาพร้อม error ใน URL บอกให้รู้ว่าเกิดอะไร
+  useEffect(() => {
+    const search = new URLSearchParams(window.location.search);
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const pick = (key: string) =>
+      search.get(key) ?? hash.get(key) ?? null;
+
+    const code = pick("error_code") ?? pick("error");
+    const desc = pick("error_description");
+
+    if (code || desc) {
+      const reason = desc ?? code ?? "";
+      const thai = reason.toLowerCase();
+
+      if (thai.includes("provider is not enabled")) {
+        flash("Discord ยังไม่เปิดใน Supabase ต้องใส่ Client ID/Secret ก่อนน้า");
+      } else if (thai.includes("email")) {
+        flash("Discord บัญชีนี้ไม่ได้ให้สิทธิ์อีเมล ลองกด Allow ตอนถาม Permission");
+      } else {
+        flash(`ล็อกอินไม่สำเร็จ: ${reason.slice(0, 90)}`);
+      }
+
+      window.history.replaceState({}, "", window.location.pathname);
+      return;
+    }
+
+    // มี code กลับมาแต่ไม่ได้ session = แลก token ไม่สำเร็จ
+    if (search.get("code")) {
+      const supabase = getSupabase();
+      if (!supabase) return;
+      const client = supabase;
+      const timer = window.setTimeout(async () => {
+        const { data } = await client.auth.getSession();
+        if (!data.session) {
+          flash(
+            "ล็อกอินไม่ติด ลองปิดแท็บนี้แล้วเปิด p-genie.vercel.app ใหม่ หรือใช้ Google",
+          );
+        }
+        window.history.replaceState({}, "", window.location.pathname);
+      }, 5000);
+      return () => window.clearTimeout(timer);
+    }
+  }, []);
+
   function flash(message: string) {
     setToast(message);
     window.setTimeout(() => setToast(null), 2400);
