@@ -46,19 +46,42 @@ export type AccountUser = {
   id: string;
   email: string | null;
   name: string | null;
+  avatarUrl: string | null;
+  provider: string | null;
 };
 
+function firstString(...values: unknown[]): string | null {
+  for (const v of values) {
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return null;
+}
+
 export function toAccountUser(
-  user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> } | null | undefined,
+  user:
+    | {
+        id: string;
+        email?: string | null;
+        user_metadata?: Record<string, unknown>;
+        app_metadata?: Record<string, unknown>;
+      }
+    | null
+    | undefined,
 ): AccountUser | null {
   if (!user) return null;
   const meta = user.user_metadata ?? {};
-  const name =
-    (typeof meta.full_name === "string" && meta.full_name) ||
-    (typeof meta.name === "string" && meta.name) ||
-    (typeof meta.display_name === "string" && meta.display_name) ||
-    null;
-  return { id: user.id, email: user.email ?? null, name };
+  const name = firstString(
+    meta.full_name,
+    meta.name,
+    meta.display_name,
+    meta.preferred_username,
+    meta.user_name,
+    meta.custom_claims && (meta.custom_claims as Record<string, unknown>).name,
+  );
+  // Google ส่ง avatar_url / picture, Discord ส่ง avatar_url
+  const avatarUrl = firstString(meta.avatar_url, meta.picture, meta.avatar);
+  const provider = firstString(user.app_metadata?.provider);
+  return { id: user.id, email: user.email ?? null, name, avatarUrl, provider };
 }
 
 // ล็อกอินด้วย Google หรือ LINE ครั้งแรกจะสมัครบัญชีให้เลย

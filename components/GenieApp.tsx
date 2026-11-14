@@ -38,6 +38,7 @@ import {
   type AccountUser,
 } from "@/lib/supabase";
 import { ChatPanel, type ChatMessage } from "./ChatPanel";
+import { AccountAvatar } from "./AccountAvatar";
 import { FolderDialog } from "./FolderDialog";
 import { GenieFace } from "./GenieFace";
 import { LoginPanel } from "./LoginPanel";
@@ -721,15 +722,23 @@ export function GenieApp() {
                 }}
                 aria-label={user ? "บัญชีของฉัน" : "เข้าสู่ระบบหรือลิงก์ห้อง"}
                 aria-expanded={pop === "account"}
-                className={`focus-ring grid h-9 w-9 place-items-center rounded-full text-[12px] font-bold transition ${
+                className={`focus-ring grid h-9 w-9 place-items-center overflow-hidden rounded-full text-[12px] font-bold transition ${
                   user
                     ? "bg-navy text-paper ring-2 ring-blue-soft"
                     : "bg-yellow text-navy"
                 }`}
               >
-                {user
-                  ? (user.name ?? user.email ?? "จ").trim().charAt(0) || "จ"
-                  : "จ"}
+                {user ? (
+                  <AccountAvatar
+                    name={user.name}
+                    email={user.email}
+                    avatarUrl={user.avatarUrl}
+                    size={36}
+                    className="bg-navy text-paper"
+                  />
+                ) : (
+                  "จ"
+                )}
               </button>
 
               {pop === "account" && (

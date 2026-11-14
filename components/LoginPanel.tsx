@@ -1,6 +1,7 @@
 "use client";
 
 import type { AccountUser } from "@/lib/supabase";
+import { AccountAvatar } from "./AccountAvatar";
 import { IconLink } from "./ui-icons";
 
 type LoginPanelProps = {
@@ -55,14 +56,23 @@ export function LoginPanel({
   onCopyLink,
 }: LoginPanelProps) {
   if (user) {
-    const initial = (user.name ?? user.email ?? "จ").trim().charAt(0) || "จ";
+    const providerLabel =
+      user.provider === "google"
+        ? "Google"
+        : user.provider === "discord"
+          ? "Discord"
+          : null;
 
     return (
       <div className="soft-shadow absolute right-0 top-11 z-30 w-[300px] rounded-2xl border border-line bg-paper p-4">
         <div className="flex items-center gap-2.5">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-yellow font-mali text-[16px] font-bold text-navy">
-            {initial}
-          </span>
+          <AccountAvatar
+            name={user.name}
+            email={user.email}
+            avatarUrl={user.avatarUrl}
+            size={40}
+            className="bg-yellow text-navy ring-1 ring-line"
+          />
           <div className="min-w-0 leading-tight">
             <p className="truncate text-[12.5px] font-semibold text-navy">
               {user.name ?? "บัญชีของฉัน"}
@@ -70,6 +80,11 @@ export function LoginPanel({
             <p className="truncate text-[10.5px] text-muted">
               {user.email ?? "ล็อกอินอยู่"}
             </p>
+            {providerLabel && (
+              <p className="mt-1 inline-flex items-center rounded-full bg-cream px-2 py-[1px] text-[9.5px] font-semibold text-muted">
+                ล็อกอินด้วย {providerLabel}
+              </p>
+            )}
           </div>
         </div>
 
