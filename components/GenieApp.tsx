@@ -631,6 +631,26 @@ export function GenieApp() {
     setActiveNav("chat");
 
     if (pendingDueTaskIds.length > 0) {
+      if (/งานไหน|อันไหน|อะไรนะ|หมายถึงงานไหน|ขอรายละเอียด/.test(text)) {
+        const pendingTasks = tasks.filter((task) =>
+          pendingDueTaskIds.includes(task.id),
+        );
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: uid(),
+            role: "genie",
+            text: `หมายถึงงานนี้จ้า\n${pendingTasks
+              .map(
+                (task) =>
+                  `• ${subjectLabel(task.subject)}: ${task.title}\nงานนี้ส่งวันไหนเหรอ?`,
+              )
+              .join("\n")}`,
+          },
+        ]);
+        return;
+      }
+
       const dueAnswer = parseTasks(text).find(
         (task) => task.due !== "ยังไม่ระบุวันส่ง",
       );
