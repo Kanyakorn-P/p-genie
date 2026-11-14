@@ -237,6 +237,22 @@ export async function setTaskDone(id: string, done: boolean): Promise<void> {
   await supabase.from("tasks").update({ done }).eq("id", id);
 }
 
+export async function updateTaskDue(
+  id: string,
+  due: string,
+  urgent: boolean,
+): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) {
+    writeLocal(
+      readLocal().map((t) => (t.id === id ? { ...t, due, urgent } : t)),
+    );
+    return;
+  }
+
+  await supabase.from("tasks").update({ due, urgent }).eq("id", id);
+}
+
 export async function deleteTask(id: string): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) {

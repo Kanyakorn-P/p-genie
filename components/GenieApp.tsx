@@ -35,6 +35,7 @@ import {
   signInWith,
   signOutNow,
   toAccountUser,
+  updateTaskDue,
   type AccountUser,
 } from "@/lib/supabase";
 import { askGenie } from "@/lib/genie-ai";
@@ -174,6 +175,7 @@ export function GenieApp() {
   const [toast, setToast] = useState<string | null>(null);
   const [user, setUser] = useState<AccountUser | null>(null);
   const [thinking, setThinking] = useState(false);
+  const [pendingDueTaskIds, setPendingDueTaskIds] = useState<string[]>([]);
 
   const chatInputRef = useRef<HTMLInputElement>(null);
   const mounted = useMounted();
@@ -606,6 +608,38 @@ export function GenieApp() {
     setInput("");
     setActiveNav("chat");
 
+    if (pendingDueTaskIds.length > 0) {
+      const dueAnswer = parseTasks(text).find(
+        (task) => task.due !== "ยังไม่ระบุวันส่ง",
+      );
+      if (dueAnswer) {
+        setTasks((prev) =>
+          prev.map((task) =>
+            pendingDueTaskIds.includes(task.id)
+              ? {
+                  ...task,
+                  due: dueAnswer.due,
+                  urgent: dueAnswer.urgent,
+                }
+              : task,
+          ),
+        );
+        for (const id of pendingDueTaskIds) {
+          void updateTaskDue(id, dueAnswer.due, dueAnswer.urgent);
+        }
+        setPendingDueTaskIds([]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: uid(),
+            role: "genie",
+            text: `โอเคจ้า อัปเดตให้แล้ว ส่ง${dueAnswer.due}นะ`,
+          },
+        ]);
+        return;
+      }
+    }
+
     // คำสั่งลบโฟลเดอร์ต้องทำเป็น action ก่อน ไม่ส่งเข้า Gemini ให้กลายเป็นการบ้าน
     const deleteTarget = folderDeleteTarget(text);
     if (deleteTarget !== undefined) {
@@ -743,6 +777,11 @@ export function GenieApp() {
     setTasks((prev) => [...newTasks, ...prev]);
     void addTasks(newTasks);
 
+    const missingDue = newTasks.filter(
+      (task) => task.due === "ยังไม่ระบุวันส่ง",
+    );
+    setPendingDueTaskIds(missingDue.map((task) => task.id));
+
     const list = normalized
       .map((p) => `• ${subjectLabel(p.subject)}: ${p.title} (${p.due})`)
       .join("\n");
@@ -751,13 +790,17 @@ export function GenieApp() {
       created.length > 0
         ? `\nเพิ่มโฟลเดอร์ให้แล้ว: ${created.map((f) => f.name).join(", ")}`
         : "";
+    const dueQuestion =
+      missingDue.length > 0
+        ? `\nงาน${missingDue.length > 1 ? "พวกนี้" : "นี้"}ส่งวันไหนเหรอ?`
+        : "";
 
     setMessages((prev) => [
       ...prev,
       {
         id: uid(),
         role: "genie",
-        text: `${aiReply ? `${aiReply}\n` : `จดให้แล้ว ${normalized.length} งานน้า ✨\n`}${list}${folderLine}`,
+        text: `${aiReply ? `${aiReply}\n` : `จดให้แล้ว ${normalized.length} งานน้า ✨\n`}${list}${folderLine}${dueQuestion}`,
       },
     ]);
   }
