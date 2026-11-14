@@ -1106,8 +1106,8 @@ export function GenieApp() {
         </header>
 
         <div className="flex min-w-0 flex-1 items-start gap-5 px-4 py-5 sm:px-6">
-          <main className="min-w-0 flex-1 space-y-5">
-            <section className="surface soft-shadow relative overflow-hidden p-5 sm:p-6">
+          <main className="flex min-w-0 flex-1 flex-col space-y-5">
+            <section className="order-0 surface soft-shadow relative overflow-hidden p-5 sm:p-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-soft px-3 py-1 text-[10.5px] font-semibold text-[#8a6410]">
@@ -1170,7 +1170,7 @@ export function GenieApp() {
               </div>
             </section>
 
-            <section id="tasks" className="scroll-mt-24">
+            <section id="tasks" className="order-2 scroll-mt-24">
               <div className="surface soft-shadow p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
@@ -1315,7 +1315,7 @@ export function GenieApp() {
               </div>
             </section>
 
-            <section>
+            <section className="order-3">
               <div className="surface soft-shadow p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
@@ -1477,7 +1477,7 @@ export function GenieApp() {
               </div>
             </section>
 
-            <section id="reminder" className="scroll-mt-24">
+            <section id="reminder" className="order-1 scroll-mt-24">
               <div className="surface soft-shadow p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
@@ -1570,7 +1570,7 @@ export function GenieApp() {
             <CalendarView tasks={tasks} />
 
             {!wide && (
-              <section id="chat" className="scroll-mt-24">
+              <section id="chat" className="order-5 scroll-mt-24">
                 <div className="surface soft-shadow flex flex-col p-4">
                   {chatPanel}
                 </div>
