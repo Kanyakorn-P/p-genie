@@ -35,13 +35,21 @@
   --color-cream-deep: #253040;
   --color-paper: #202b3a;
   --color-line: #3b485b;
+  --color-navy: #d9e7ff;
+  --color-navy-deep: #c3d8fa;
+  --color-blue: #83b4ff;
   --color-ink: #eef3f8;
   --color-muted: #aab6c5;
   --color-blue-soft: #263f68;
   --color-yellow-soft: #514721;
+  --color-yellow: #ffd45a;
+  --color-red: #ff958c;
   --color-green-soft: #244333;
+  --color-green: #99d6a0;
   --color-red-soft: #512f34;
+  --color-plum: #c9a9ff;
   --color-plum-soft: #3d3155;
+  color-scheme: dark;
 }
 
 @layer base {
