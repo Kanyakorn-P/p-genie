@@ -500,11 +500,21 @@ export function GenieApp() {
   async function handleSignIn(provider: "google" | "line") {
     const label = provider === "google" ? "Google" : "LINE";
     const error = await signInWith(provider);
-    if (error) {
-      flash(`ยังเปิดล็อกอิน ${label} ไม่ได้: ${error}`);
+    if (!error) {
+      setPop(null);
       return;
     }
-    setPop(null);
+
+    if (error.toLowerCase().includes("not enabled")) {
+      flash(
+        provider === "google"
+          ? "Google ยังไม่เปิดใน Supabase ต้องใส่ Client ID/Secret ก่อนน้า"
+          : "LINE ยังไม่เปิดใน Supabase ต้องเพิ่มเป็น custom:line ก่อนน้า",
+      );
+      return;
+    }
+
+    flash(`ล็อกอิน ${label} ไม่สำเร็จ: ${error}`);
   }
 
   async function handleSignOut() {

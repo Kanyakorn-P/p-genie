@@ -69,14 +69,19 @@ export async function signInWith(provider: "google" | "line"): Promise<string | 
   // Google ใช้ของ Supabase ที่มีให้เลย ส่วน LINE ต้องเพิ่มเป็น custom OIDC ก่อน
   const providerId = provider === "google" ? "google" : "custom:line";
 
-  const { error } = await supabase.auth.signInWithOAuth({
+  const { data, error } = await supabase.auth.signInWithOAuth({
     provider: providerId,
     options: {
       redirectTo: `${window.location.origin}${window.location.pathname}`,
+      skipBrowserRedirect: true,
     },
   });
 
-  return error?.message ?? null;
+  if (error) return error.message;
+  if (!data?.url) return "เปิดหน้าล็อกอินไม่สำเร็จ";
+
+  window.location.assign(data.url);
+  return null;
 }
 
 export async function signOutNow(): Promise<void> {
