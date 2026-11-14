@@ -403,6 +403,7 @@ export function GenieApp() {
         .includes(q);
       })
       .sort((a, b) => {
+        if (a.done !== b.done) return a.done ? 1 : -1;
         const dueOrder = dueSortRank(a.due) - dueSortRank(b.due);
         if (dueOrder !== 0) return dueOrder;
         const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
