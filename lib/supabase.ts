@@ -85,19 +85,17 @@ export async function enabledProviders(): Promise<Record<string, boolean>> {
   return providerCache;
 }
 
-export async function signInWith(provider: "google" | "line"): Promise<string | null> {
+export async function signInWith(
+  provider: "google" | "discord",
+): Promise<string | null> {
   const supabase = getSupabase();
   if (!supabase) return "ยังไม่ได้ตั้งค่า Supabase";
 
   const enabled = await enabledProviders();
-  const providerKey = provider === "google" ? "google" : "custom:line";
-  if (!enabled[providerKey]) return "provider is not enabled";
-
-  // Google ใช้ของ Supabase ที่มีให้เลย ส่วน LINE ต้องเพิ่มเป็น custom OIDC ก่อน
-  const providerId = provider === "google" ? "google" : "custom:line";
+  if (!enabled[provider]) return "provider is not enabled";
 
   const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: providerId,
+    provider,
     options: {
       redirectTo: `${window.location.origin}${window.location.pathname}`,
       skipBrowserRedirect: true,

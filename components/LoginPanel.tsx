@@ -6,7 +6,7 @@ import { IconLink } from "./ui-icons";
 type LoginPanelProps = {
   user: AccountUser | null;
   onGoogle: () => void;
-  onLine: () => void;
+  onDiscord: () => void;
   onSignOut: () => void;
   roomCode: string;
   onCopyLink: () => void;
@@ -35,24 +35,13 @@ function GoogleMark({ size = 16 }: { size?: number }) {
   );
 }
 
-function LineMark({ size = 16 }: { size?: number }) {
+function DiscordMark({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
       <path
         fill="#ffffff"
-        d="M12 3.2c5 0 9 3.2 9 7.2 0 3.6-3.1 6.6-7.3 7.1-.3.1-.7.2-.8.5-.1.2-.1.5-.1.7l-.1.8c0 .2-.2.9-.8.9-.3 0-.6-.2-.9-.5-2.5-2.7-3.3-3.9-4.4-5.2C4.3 13.4 3 11.9 3 10.4c0-4 4-7.2 9-7.2Z"
+        d="M20.32 4.37a19.8 19.8 0 0 0-4.89-1.51.07.07 0 0 0-.08.03c-.21.38-.44.87-.61 1.25a18.3 18.3 0 0 0-5.49 0c-.16-.39-.4-.87-.62-1.25a.08.08 0 0 0-.08-.03 19.74 19.74 0 0 0-4.88 1.51.07.07 0 0 0-.04.03C.53 9.05-.32 13.58.1 18.06a.08.08 0 0 0 .03.06 19.9 19.9 0 0 0 5.99 3.03.08.08 0 0 0 .08-.03c.46-.63.87-1.3 1.23-2a.08.08 0 0 0-.04-.1 13.1 13.1 0 0 1-1.87-.9.08.08 0 0 1 0-.12l.37-.3a.07.07 0 0 1 .08 0 14.2 14.2 0 0 0 12.06 0 .07.07 0 0 1 .08.01l.37.3a.08.08 0 0 1 0 .12c-.6.35-1.22.65-1.87.89a.08.08 0 0 0-.04.11c.36.7.77 1.36 1.22 1.99a.08.08 0 0 0 .09.03 19.84 19.84 0 0 0 6-3.03.08.08 0 0 0 .03-.06c.5-5.18-.84-9.67-3.55-13.66a.06.06 0 0 0-.03-.03ZM8.02 15.33c-1.18 0-2.16-1.08-2.16-2.42s.96-2.42 2.16-2.42c1.21 0 2.18 1.1 2.16 2.42 0 1.34-.96 2.42-2.16 2.42Zm7.97 0c-1.18 0-2.16-1.08-2.16-2.42s.96-2.42 2.16-2.42c1.21 0 2.18 1.1 2.16 2.42 0 1.34-.95 2.42-2.16 2.42Z"
       />
-      <text
-        x="12"
-        y="12.4"
-        textAnchor="middle"
-        fontSize="4.6"
-        fontWeight="700"
-        fill="#06C755"
-        fontFamily="Arial, sans-serif"
-      >
-        LINE
-      </text>
     </svg>
   );
 }
@@ -60,7 +49,7 @@ function LineMark({ size = 16 }: { size?: number }) {
 export function LoginPanel({
   user,
   onGoogle,
-  onLine,
+  onDiscord,
   onSignOut,
   roomCode,
   onCopyLink,
@@ -114,11 +103,11 @@ export function LoginPanel({
       </button>
 
       <button
-        onClick={onLine}
-        className="focus-ring mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#06C755] px-3 py-2.5 text-[12px] font-semibold text-white transition hover:bg-[#05b34c]"
+        onClick={onDiscord}
+        className="focus-ring mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#5865F2] px-3 py-2.5 text-[12px] font-semibold text-white transition hover:bg-[#4752C4]"
       >
-        <LineMark />
-        ดำเนินการต่อด้วย LINE
+        <DiscordMark />
+        ดำเนินการต่อด้วย Discord
       </button>
 
       <p className="mt-2 text-center text-[10px] leading-relaxed text-muted">

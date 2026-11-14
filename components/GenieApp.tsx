@@ -497,8 +497,8 @@ export function GenieApp() {
     }
   }
 
-  async function handleSignIn(provider: "google" | "line") {
-    const label = provider === "google" ? "Google" : "LINE";
+  async function handleSignIn(provider: "google" | "discord") {
+    const label = provider === "google" ? "Google" : "Discord";
     const error = await signInWith(provider);
     if (!error) {
       setPop(null);
@@ -509,7 +509,7 @@ export function GenieApp() {
       flash(
         provider === "google"
           ? "Google ยังไม่เปิดใน Supabase ต้องใส่ Client ID/Secret ก่อนน้า"
-          : "LINE ยังไม่เปิดใน Supabase ต้องเพิ่มเป็น custom:line ก่อนน้า",
+          : "Discord ยังไม่เปิดใน Supabase ต้องใส่ Client ID/Secret ก่อนน้า",
       );
       return;
     }
@@ -698,7 +698,7 @@ export function GenieApp() {
                   <LoginPanel
                     user={user}
                     onGoogle={() => void handleSignIn("google")}
-                    onLine={() => void handleSignIn("line")}
+                    onDiscord={() => void handleSignIn("discord")}
                     onSignOut={() => void handleSignOut()}
                     roomCode={roomCode}
                     onCopyLink={() => {
