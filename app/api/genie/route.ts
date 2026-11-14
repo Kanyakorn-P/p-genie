@@ -12,16 +12,49 @@ type GenieResult = {
   reply: string;
 };
 
-const MODELS = [
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
-  "gemini-2.0-flash",
-];
+const FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-2.5-flash"];
 
 const ATTEMPT_TIMEOUT_MS = 8000;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// ถาม Google ว่าตอนนี้มีรุ่นไหนใช้ได้บ้าง (รุ่นเก่าถูกปิดไปเรื่อย ๆ)
+let modelCache: { names: string[]; at: number } | null = null;
+
+async function pickModels(key: string): Promise<string[]> {
+  if (modelCache && Date.now() - modelCache.at < 10 * 60 * 1000) {
+    return modelCache.names;
+  }
+
+  try {
+    const res = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models?pageSize=100",
+      {
+        headers: { "x-goog-api-key": key },
+        signal: AbortSignal.timeout(6000),
+      },
+    );
+
+    if (res.ok) {
+      const json = (await res.json()) as {
+        models?: { name?: string; supportedGenerationMethods?: string[] }[];
+      };
+      const names = (json.models ?? [])
+        .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+        .map((m) => (m.name ?? "").replace(/^models\//, ""))
+        .filter((m) => m.includes("flash") && !m.includes("thinking"));
+      if (names.length > 0) {
+        modelCache = { names: names.slice(0, 4), at: Date.now() };
+        return modelCache.names;
+      }
+    }
+  } catch {
+    // ใช้ลิสต์สำรองต่อ
+  }
+
+  return FALLBACK_MODELS;
 }
 
 const SYSTEM_PROMPT = `You are "พี่จินนี่" (P' Genie), a friendly Thai study buddy inside a homework to-do app.
@@ -126,10 +159,11 @@ export async function POST(request: Request) {
   let lastError = "ต่อ Gemini ไม่ได้";
   const startedAt = Date.now();
   const BUDGET_MS = 15000;
+  const models = await pickModels(key);
 
   // ลองรุ่นที่เบากว่า + ลองซ้ำอีกรอบ เผื่อ Google ตอบ 503 เพราะคนใช้เยอะ
   for (let round = 0; round < 2; round += 1) {
-    for (const model of MODELS) {
+    for (const model of models) {
       if (Date.now() - startedAt > BUDGET_MS) {
         return NextResponse.json(
           { error: lastError || "Gemini ตอบช้าเกินไป" },
