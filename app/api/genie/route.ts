@@ -12,7 +12,17 @@ type GenieResult = {
   reply: string;
 };
 
-const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"];
+const MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-2.0-flash",
+];
+
+const ATTEMPT_TIMEOUT_MS = 8000;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 const SYSTEM_PROMPT = `You are "พี่จินนี่" (P' Genie), a friendly Thai study buddy inside a homework to-do app.
 Your job: read what the student typed (usually Thai, sometimes messy or with typos) and turn it into homework items.
@@ -114,50 +124,64 @@ export async function POST(request: Request) {
   };
 
   let lastError = "ต่อ Gemini ไม่ได้";
+  const startedAt = Date.now();
+  const BUDGET_MS = 15000;
 
-  for (const model of MODELS) {
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": key,
+  // ลองรุ่นที่เบากว่า + ลองซ้ำอีกรอบ เผื่อ Google ตอบ 503 เพราะคนใช้เยอะ
+  for (let round = 0; round < 2; round += 1) {
+    for (const model of MODELS) {
+      if (Date.now() - startedAt > BUDGET_MS) {
+        return NextResponse.json(
+          { error: lastError || "Gemini ตอบช้าเกินไป" },
+          { status: 504 },
+        );
+      }
+
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": key,
+            },
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
           },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(20000),
-        },
-      );
+        );
 
-      if (!res.ok) {
-        lastError = `${model}: ${res.status} ${(await res.text()).slice(0, 160)}`;
-        continue;
+        if (!res.ok) {
+          lastError = `${model}: ${res.status} ${(await res.text()).slice(0, 160)}`;
+          continue;
+        }
+
+        const json = (await res.json()) as {
+          candidates?: { content?: { parts?: { text?: string }[] } }[];
+        };
+        const raw = json.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!raw) {
+          lastError = `${model}: ไม่มีคำตอบกลับมา`;
+          continue;
+        }
+
+        const parsed = JSON.parse(raw) as { tasks?: unknown; reply?: unknown };
+        const tasks = Array.isArray(parsed.tasks)
+          ? parsed.tasks.map(cleanTask).filter((t): t is GenieTask => t !== null)
+          : [];
+        const reply =
+          typeof parsed.reply === "string" && parsed.reply.trim()
+            ? parsed.reply.trim().slice(0, 400)
+            : "";
+
+        const result: GenieResult = { tasks: tasks.slice(0, 8), reply };
+        return NextResponse.json(result);
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : "ต่อ Gemini ไม่ได้";
       }
-
-      const json = (await res.json()) as {
-        candidates?: { content?: { parts?: { text?: string }[] } }[];
-      };
-      const raw = json.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!raw) {
-        lastError = `${model}: ไม่มีคำตอบกลับมา`;
-        continue;
-      }
-
-      const parsed = JSON.parse(raw) as { tasks?: unknown; reply?: unknown };
-      const tasks = Array.isArray(parsed.tasks)
-        ? parsed.tasks.map(cleanTask).filter((t): t is GenieTask => t !== null)
-        : [];
-      const reply =
-        typeof parsed.reply === "string" && parsed.reply.trim()
-          ? parsed.reply.trim().slice(0, 400)
-          : "";
-
-      const result: GenieResult = { tasks: tasks.slice(0, 8), reply };
-      return NextResponse.json(result);
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : "ต่อ Gemini ไม่ได้";
     }
+
+    if (round === 0) await sleep(600);
   }
 
   return NextResponse.json({ error: lastError }, { status: 502 });
