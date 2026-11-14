@@ -538,6 +538,12 @@ export function GenieApp() {
     );
   }
 
+  function isVagueHomeworkMessage(text: string) {
+    return /^(?:มี|เพิ่ม|จด|ช่วยจด)?\s*(?:การบ้าน|งาน)\s*(?:เพิ่ม|ใหม่)?\s*(?:แล้ว|นะ|จ้า)?$/i.test(
+      text.trim(),
+    );
+  }
+
   function casualReply(text: string): string | null {
     const value = text.trim();
     const hasHomeworkIntent =
@@ -699,6 +705,18 @@ export function GenieApp() {
       setMessages((prev) => [
         ...prev,
         { id: uid(), role: "genie", text: answer },
+      ]);
+      return;
+    }
+
+    if (isVagueHomeworkMessage(text)) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uid(),
+          role: "genie",
+          text: "ได้เลยจ้า มีงานอะไรเพิ่มบ้าง? บอกพี่จินนี่ได้เลยว่าเป็นวิชาอะไร ทำอะไร และส่งวันไหน เช่น “คณิตทำแบบฝึกหัดหน้า 20 ส่งพรุ่งนี้”",
+        },
       ]);
       return;
     }
