@@ -64,6 +64,13 @@ function dueDate(due: string, now: Date): Date | null {
     return new Date(now.getFullYear(), month, Number(explicit[1]));
   }
 
+  const numeric = due.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+  if (numeric) {
+    const numericYear = numeric[3] ? Number(numeric[3]) : now.getFullYear();
+    const year = numericYear < 100 ? 2000 + numericYear : numericYear;
+    return new Date(year, Number(numeric[2]) - 1, Number(numeric[1]));
+  }
+
   const weekdays = [
     "อาทิตย์",
     "จันทร์",

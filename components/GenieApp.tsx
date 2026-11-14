@@ -234,6 +234,21 @@ function dueSortRank(due: string): number {
     );
   }
 
+  const numericDate = due.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+  if (numericDate) {
+    const year = numericDate[3]
+      ? Number(numericDate[3]) < 100
+        ? 2000 + Number(numericDate[3])
+        : Number(numericDate[3])
+      : new Date().getFullYear();
+    const target = new Date(year, Number(numericDate[2]) - 1, Number(numericDate[1]));
+    const today = new Date();
+    return Math.max(
+      0,
+      Math.ceil((target.getTime() - today.getTime()) / 86400000),
+    );
+  }
+
   const numberOfDays = due.match(/อีก\s*(\d+)\s*วัน/);
   if (numberOfDays) return Number(numberOfDays[1]);
   return 100000;

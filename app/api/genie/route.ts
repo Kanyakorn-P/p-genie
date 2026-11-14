@@ -91,7 +91,7 @@ Rules:
 - Understand Thai school slang: ฟิ or ฟิสิกส์ = ฟิสิกส์, เลข or คณิต = คณิต, ชีวะ or ชีวะวิทยา = ชีววิทยา, อิ๊ง or อังกฤษ = อังกฤษ, วิทย์ = วิทยาศาสตร์, สังคมศึกษา = สังคม, ไทย = ไทย, เคมี = เคมี.
 - Correct common typos and speech-to-text mistakes: ฟิสิก, ฟิสิกส์, ฟิ = ฟิสิกส์; คณิด, คณิต = คณิต; วิท, วิทย์ = วิทยาศาสตร์; ชีวะ = ชีววิทยา; การบ้านน = การบ้าน. Keep the intended meaning instead of copying the typo into the task.
 - Understand topic clues: เซล or เซลล์ means ชีววิทยา, even when the student says วิทย์. For example, งานวิทย์เรื่องเซลล์ must go to ชีววิทยา.
-- due: copy the deadline wording from the message (วันนี้, พรุ่งนี้, มะรืนนี้, วันศุกร์, สัปดาห์หน้า, 12 ม.ค. ...). If there is no deadline, use "ยังไม่ระบุวันส่ง".
+- due: copy the deadline wording from the message (วันนี้, พรุ่งนี้, มะรืนนี้, วันศุกร์, สัปดาห์หน้า, 12 ม.ค., 30/11 ...). If there is no deadline, use "ยังไม่ระบุวันส่ง".
 - urgent: true only when due is วันนี้, พรุ่งนี้ or มะรืนนี้.
 - Words about weather, body, mood, or feelings such as ร้อน, หนาว, หิว, งง, เบื่อ, เหนื่อย, เครียด, ปวดหัว are conversation unless the student clearly connects them to homework.
 - folders: list of folder names that should exist in the app. Always include the subject of every task you return. If the student asks to organise or separate their homework into folders, add those folder names too. If the student mentions a folder that is not in their current list, add it. Use the same full Thai subject names. Never repeat a name that is already in the student's folder list.
