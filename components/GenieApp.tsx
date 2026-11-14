@@ -165,6 +165,7 @@ export function GenieApp() {
   const [input, setInput] = useState("");
 
   const [query, setQuery] = useState("");
+  const [taskPage, setTaskPage] = useState(1);
   const [filter, setFilter] = useState<Filter>(null);
   const [activeNav, setActiveNav] = useState<NavKey>("home");
   const [dialog, setDialog] = useState<
@@ -347,6 +348,12 @@ export function GenieApp() {
         .includes(q);
     });
   }, [tasks, filter, query, folders]);
+  const taskPageCount = Math.max(1, Math.ceil(visibleTasks.length / 5));
+  const currentTaskPage = Math.min(taskPage, taskPageCount);
+  const pagedTasks = visibleTasks.slice(
+    (currentTaskPage - 1) * 5,
+    currentTaskPage * 5,
+  );
 
   const tomorrowTasks = useMemo(
     () => tasks.filter((t) => !t.done && dueMatches(t.due, "พรุ่งนี้")),
@@ -1229,7 +1236,7 @@ export function GenieApp() {
                     </div>
                   )}
 
-                  {visibleTasks.map((t) => (
+                  {pagedTasks.map((t) => (
                     <TaskRow
                       key={t.id}
                       task={t}
@@ -1241,6 +1248,49 @@ export function GenieApp() {
                       onDelete={removeTask}
                     />
                   ))}
+
+                  {visibleTasks.length > 5 && (
+                    <div className="mt-4 flex flex-wrap items-center justify-center gap-2 border-t border-line pt-4">
+                      <button
+                        onClick={() => setTaskPage((page) => Math.max(1, page - 1))}
+                        disabled={currentTaskPage === 1}
+                        className="focus-ring rounded-full border border-line px-3 py-1.5 text-[11px] font-semibold text-navy disabled:opacity-30"
+                      >
+                        ก่อนหน้า
+                      </button>
+                      <span className="text-[11px] text-muted">หน้า</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={taskPageCount}
+                        value={currentTaskPage}
+                        onChange={(event) => {
+                          const next = Number(event.target.value);
+                          if (Number.isFinite(next)) {
+                            setTaskPage(
+                              Math.min(taskPageCount, Math.max(1, next)),
+                            );
+                          }
+                        }}
+                        aria-label="หมายเลขหน้าการบ้าน"
+                        className="h-8 w-14 rounded-full border border-line bg-paper text-center text-[11px] font-bold text-navy outline-none focus:border-blue"
+                      />
+                      <span className="text-[11px] text-muted">
+                        / {taskPageCount}
+                      </span>
+                      <button
+                        onClick={() =>
+                          setTaskPage((page) =>
+                            Math.min(taskPageCount, page + 1),
+                          )
+                        }
+                        disabled={currentTaskPage === taskPageCount}
+                        className="focus-ring rounded-full border border-line px-3 py-1.5 text-[11px] font-semibold text-navy disabled:opacity-30"
+                      >
+                        ถัดไป
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </section>
