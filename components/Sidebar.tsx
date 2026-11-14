@@ -165,7 +165,7 @@ export function Sidebar({
                 aria-pressed={active}
               >
                 <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${tone.dot}`} />
-                <span className="min-w-0 flex-1 truncate text-[12px] font-medium">
+                <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-ink">
                   {folder.name}
                 </span>
                 <span className="shrink-0 rounded-full bg-cream-deep px-1.5 text-[10px] font-semibold text-muted">
