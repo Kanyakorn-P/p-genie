@@ -1592,6 +1592,15 @@ export function GenieApp() {
             </aside>
           )}
         </div>
+        <footer className="border-t border-line bg-paper/75 px-6 py-4 text-center text-[11px] text-muted">
+          <span>มีคำแนะนำหรืออยากคุยกับเราไหม? </span>
+          <a
+            href="mailto:sapmy.ass@gmail.com"
+            className="font-semibold text-navy underline decoration-line underline-offset-2 transition hover:text-blue"
+          >
+            Contact us
+          </a>
+        </footer>
       </div>
 
       {dialog && (
