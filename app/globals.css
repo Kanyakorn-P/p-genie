@@ -41,8 +41,8 @@
   --color-ink: #eef3f8;
   --color-muted: #aab6c5;
   --color-blue-soft: #263f68;
-  --color-yellow-soft: #514721;
-  --color-yellow: #ffd45a;
+  --color-yellow-soft: #3a434f;
+  --color-yellow: #aeb8c5;
   --color-red: #ff958c;
   --color-green-soft: #244333;
   --color-green: #99d6a0;
@@ -50,6 +50,10 @@
   --color-plum: #c9a9ff;
   --color-plum-soft: #3d3155;
   color-scheme: dark;
+}
+
+.dark [class~="text-[#8a6410]"] {
+  color: var(--color-ink);
 }
 
 @layer base {
