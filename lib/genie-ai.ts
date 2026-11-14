@@ -8,6 +8,7 @@ export type AiTask = {
 export type AiResult = {
   tasks: AiTask[];
   reply: string;
+  folders: string[];
 };
 
 // ถามพี่จินนี่ (Gemini) ผ่าน API ในแอป ถ้าพลาดคืน null ให้ไปใช้กฎในเครื่องแทน
@@ -31,6 +32,9 @@ export async function askGenie(
     return {
       tasks: json.tasks,
       reply: typeof json.reply === "string" ? json.reply : "",
+      folders: Array.isArray(json.folders)
+        ? json.folders.filter((f): f is string => typeof f === "string")
+        : [],
     };
   } catch {
     return null;

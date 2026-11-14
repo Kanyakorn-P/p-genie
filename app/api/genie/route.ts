@@ -10,6 +10,7 @@ type GenieTask = {
 type GenieResult = {
   tasks: GenieTask[];
   reply: string;
+  folders: string[];
 };
 
 const FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-2.5-flash"];
@@ -83,9 +84,12 @@ Rules:
 - Reply in casual Thai, like an older friend. Warm, short, no em dashes, no formal words.
 - Split into separate tasks when the student mentions several homeworks in one message.
 - title: what the homework is, short and clear, keep important details (page, chapter, exercise numbers).
-- subject: pick the school subject. Prefer one of the student's folders if it fits. Common values: คณิต, ไทย, อังกฤษ, วิทยาศาสตร์, ฟิสิกส์, เคมี, ชีววิทยา, สังคม, อื่นๆ.
+- subject: pick the school subject. Use the full Thai name, never an abbreviation: คณิต, ไทย, อังกฤษ, วิทยาศาสตร์, ฟิสิกส์, เคมี, ชีววิทยา, สังคม, อื่นๆ. Prefer one of the student's folders when it fits.
+- Understand Thai school slang: ฟิ or ฟิสิกส์ = ฟิสิกส์, เลข or คณิต = คณิต, ชีวะ or ชีวะวิทยา = ชีววิทยา, อิ๊ง or อังกฤษ = อังกฤษ, วิทย์ = วิทยาศาสตร์, สังคมศึกษา = สังคม, ไทย = ไทย, เคมี = เคมี.
 - due: copy the deadline wording from the message (วันนี้, พรุ่งนี้, มะรืนนี้, วันศุกร์, สัปดาห์หน้า, 12 ม.ค. ...). If there is no deadline, use "ยังไม่ระบุวันส่ง".
 - urgent: true only when due is วันนี้, พรุ่งนี้ or มะรืนนี้.
+- folders: list of folder names that should exist in the app. Always include the subject of every task you return. If the student asks to organise or separate their homework into folders, add those folder names too. If the student mentions a folder that is not in their current list, add it. Use the same full Thai subject names. Never repeat a name that is already in the student's folder list.
+- Do not create a folder named อื่นๆ.
 - If the message is not about homework (greeting, question, complaint), return an empty tasks list and just answer them in reply.
 - Never invent homework that the student did not mention.`;
 
@@ -106,8 +110,9 @@ const RESPONSE_SCHEMA = {
       },
     },
     reply: { type: "string" },
+    folders: { type: "array", items: { type: "string" } },
   },
-  required: ["tasks", "reply"],
+  required: ["tasks", "reply", "folders"],
 };
 
 function cleanTask(raw: unknown): GenieTask | null {
@@ -218,7 +223,11 @@ export async function POST(request: Request) {
           continue;
         }
 
-        const parsed = JSON.parse(raw) as { tasks?: unknown; reply?: unknown };
+        const parsed = JSON.parse(raw) as {
+          tasks?: unknown;
+          reply?: unknown;
+          folders?: unknown;
+        };
         const tasks = Array.isArray(parsed.tasks)
           ? parsed.tasks.map(cleanTask).filter((t): t is GenieTask => t !== null)
           : [];
@@ -227,7 +236,18 @@ export async function POST(request: Request) {
             ? parsed.reply.trim().slice(0, 400)
             : "";
 
-        const result: GenieResult = { tasks: tasks.slice(0, 8), reply };
+        const folders = Array.isArray(parsed.folders)
+          ? [
+              ...new Set(
+                parsed.folders
+                  .filter((f): f is string => typeof f === "string")
+                  .map((f) => f.trim().slice(0, 40))
+                  .filter((f) => f.length > 0 && f !== "อื่นๆ"),
+              ),
+            ].slice(0, 6)
+          : [];
+
+        const result: GenieResult = { tasks: tasks.slice(0, 8), reply, folders };
         return NextResponse.json(result);
       } catch (error) {
         lastError = error instanceof Error ? error.message : "ต่อ Gemini ไม่ได้";

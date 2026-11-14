@@ -8,7 +8,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { subjectLabel, type Task } from "@/lib/data";
+import { NO_SUBJECT, subjectLabel, type Task } from "@/lib/data";
 import { parseTasks } from "@/lib/parse";
 import {
   deleteFolderRow,
@@ -472,6 +472,43 @@ export function GenieApp() {
     flash(`ลบโฟลเดอร์ "${folder.name}" แล้ว`);
   }
 
+  // สร้างโฟลเดอร์ให้วิชาที่ยังไม่มี (เช่นพิมพ์ "ฟิ" ก็ได้โฟลเดอร์ "ฟิสิกส์" เอง)
+  function ensureFolders(names: string[]): {
+    canonical: Map<string, string>;
+    created: Folder[];
+  } {
+    const working = [...folders];
+    const created: Folder[] = [];
+    const canonical = new Map<string, string>();
+
+    for (const raw of names) {
+      const name = raw.trim();
+      if (!name || name === NO_SUBJECT || canonical.has(name)) continue;
+
+      const found = folderForSubject(name, working);
+      if (found) {
+        canonical.set(name, found.name);
+        continue;
+      }
+
+      const folder: Folder = {
+        id: uid(),
+        name,
+        color: colorForName(name, working),
+      };
+      working.push(folder);
+      created.push(folder);
+      canonical.set(name, name);
+    }
+
+    if (created.length > 0) {
+      setFolders((prev) => [...prev, ...created]);
+      for (const folder of created) void insertFolder(folder);
+    }
+
+    return { canonical, created };
+  }
+
   async function send() {
     const text = input.trim();
     if (!text || thinking) return;
@@ -493,21 +530,40 @@ export function GenieApp() {
     const parsed = ai && ai.tasks.length > 0 ? ai.tasks : parseTasks(text);
     const aiReply = ai && ai.tasks.length > 0 ? ai.reply : "";
 
-    if (parsed.length === 0) {
+    // สร้างโฟลเดอร์จากวิชาของงาน + โฟลเดอร์ที่พี่จินนี่บอกว่าควรมี
+    const { canonical, created } = ensureFolders([
+      ...parsed.map((p) => p.subject),
+      ...(ai?.folders ?? []),
+    ]);
+
+    const normalized = parsed.map((p) => ({
+      ...p,
+      subject: canonical.get(p.subject) ?? p.subject,
+    }));
+
+    if (normalized.length === 0) {
+      const folderLine =
+        created.length > 0
+          ? `\nเพิ่มโฟลเดอร์ให้แล้ว: ${created.map((f) => f.name).join(", ")}`
+          : "";
+
       setMessages((prev) => [
         ...prev,
         {
           id: uid(),
           role: "genie",
           text:
-            ai?.reply ||
-            "ยังไม่เห็นการบ้านเลย ลองพิมพ์อีกทีนะ เช่น ฟิสิกส์หน้า 45 ส่งพรุ่งนี้",
+            (ai?.reply ||
+              (created.length > 0
+                ? "แยกโฟลเดอร์ให้เรียบร้อยแล้วน้า"
+                : "ยังไม่เห็นการบ้านเลย ลองพิมพ์อีกทีนะ เช่น ฟิสิกส์หน้า 45 ส่งพรุ่งนี้")) +
+            folderLine,
         },
       ]);
       return;
     }
 
-    const newTasks: Task[] = parsed.map((p) => ({
+    const newTasks: Task[] = normalized.map((p) => ({
       id: uid(),
       title: p.title,
       subject: p.subject,
@@ -519,16 +575,21 @@ export function GenieApp() {
     setTasks((prev) => [...newTasks, ...prev]);
     void addTasks(newTasks);
 
-    const list = parsed
+    const list = normalized
       .map((p) => `• ${subjectLabel(p.subject)}: ${p.title} (${p.due})`)
       .join("\n");
+
+    const folderLine =
+      created.length > 0
+        ? `\nเพิ่มโฟลเดอร์ให้แล้ว: ${created.map((f) => f.name).join(", ")}`
+        : "";
 
     setMessages((prev) => [
       ...prev,
       {
         id: uid(),
         role: "genie",
-        text: `${aiReply ? `${aiReply}\n` : `จดให้แล้ว ${parsed.length} งานน้า ✨\n`}${list}\nถ้าอยากแยกเป็นโฟลเดอร์วิชา บอกพี่จินนี่ได้เลย`,
+        text: `${aiReply ? `${aiReply}\n` : `จดให้แล้ว ${normalized.length} งานน้า ✨\n`}${list}${folderLine}`,
       },
     ]);
   }

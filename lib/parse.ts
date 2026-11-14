@@ -7,15 +7,17 @@ export type ParsedTask = {
   urgent: boolean;
 };
 
-const SUBJECT_REGEX = /(ฟิสิกส์|ฟิ|ภาษาไทย|ไทย|คณิตศาสตร์|คณิต|สังคม|อังกฤษ|ภาษาอังกฤษ|ชีวะ|ชีววิทยา|เคมี)/g;
+const SUBJECT_REGEX =
+  /(ฟิสิกส์|ฟิ|ภาษาไทย|ไทย|คณิตศาสตร์|คณิต|เลข|สังคมศึกษา|สังคม|ภาษาอังกฤษ|อังกฤษ|อิ๊ง|ชีววิทยา|ชีวะ|วิทยาศาสตร์|วิทย์|เคมี)/g;
 
 function toSubject(word: string): string {
   if (word.startsWith("ฟิ")) return "ฟิสิกส์";
-  if (word.startsWith("คณิต")) return "คณิต";
+  if (word.startsWith("คณิต") || word === "เลข") return "คณิต";
   if (word.includes("ไทย")) return "ไทย";
-  if (word.includes("อังกฤษ")) return "อังกฤษ";
+  if (word.includes("อังกฤษ") || word === "อิ๊ง") return "อังกฤษ";
   if (word.includes("สังคม")) return "สังคม";
   if (word.startsWith("ชีว")) return "ชีววิทยา";
+  if (word.startsWith("วิทย")) return "วิทยาศาสตร์";
   if (word.includes("เคมี")) return "เคมี";
   return NO_SUBJECT;
 }
