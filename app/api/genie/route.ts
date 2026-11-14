@@ -115,6 +115,22 @@ const RESPONSE_SCHEMA = {
   required: ["tasks", "reply", "folders"],
 };
 
+const SUBJECT_EXACT: Record<string, string> = {
+  ภาษาไทย: "ไทย",
+  ภาษาอังกฤษ: "อังกฤษ",
+  คณิตศาสตร์: "คณิต",
+  สังคมศึกษา: "สังคม",
+  เลข: "คณิต",
+  อิ๊ง: "อังกฤษ",
+  ชีวะ: "ชีววิทยา",
+  วิทย์: "วิทยาศาสตร์",
+  ฟิ: "ฟิสิกส์",
+};
+
+function normalizeSubjectName(name: string) {
+  return SUBJECT_EXACT[name] ?? name;
+}
+
 function cleanTask(raw: unknown): GenieTask | null {
   if (!raw || typeof raw !== "object") return null;
   const t = raw as Record<string, unknown>;
@@ -122,7 +138,7 @@ function cleanTask(raw: unknown): GenieTask | null {
   if (!title) return null;
   const subject =
     typeof t.subject === "string" && t.subject.trim()
-      ? t.subject.trim()
+      ? normalizeSubjectName(t.subject.trim())
       : "อื่นๆ";
   const due =
     typeof t.due === "string" && t.due.trim()
@@ -241,7 +257,7 @@ export async function POST(request: Request) {
               ...new Set(
                 parsed.folders
                   .filter((f): f is string => typeof f === "string")
-                  .map((f) => f.trim().slice(0, 40))
+                  .map((f) => normalizeSubjectName(f.trim().slice(0, 40)))
                   .filter((f) => f.length > 0 && f !== "อื่นๆ"),
               ),
             ].slice(0, 6)
