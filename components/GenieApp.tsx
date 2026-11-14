@@ -1318,7 +1318,7 @@ export function GenieApp() {
               </div>
             </section>
 
-            <section className="order-3">
+            <section className="order-4">
               <div className="surface soft-shadow p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
@@ -1399,7 +1399,7 @@ export function GenieApp() {
               </div>
             </section>
 
-            <section>
+            <section className="order-5">
               <div className="surface soft-shadow p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
@@ -1573,7 +1573,7 @@ export function GenieApp() {
             <CalendarView tasks={tasks} />
 
             {!wide && (
-              <section id="chat" className="order-5 scroll-mt-24">
+              <section id="chat" className="order-6 scroll-mt-24">
                 <div className="surface soft-shadow flex flex-col p-4">
                   {chatPanel}
                 </div>

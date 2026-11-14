@@ -135,7 +135,7 @@ export function CalendarView({ tasks }: CalendarViewProps) {
   }
 
   return (
-    <section className="order-4 surface soft-shadow p-5">
+    <section className="order-3 surface soft-shadow p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-[17px] font-bold text-navy">ปฏิทินการบ้าน</h2>
