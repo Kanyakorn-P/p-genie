@@ -536,6 +536,29 @@ export function GenieApp() {
     );
   }
 
+  function casualReply(text: string): string | null {
+    const value = text.trim();
+    const hasHomeworkIntent =
+      /(การบ้าน|งาน|ส่ง|ทำ|สอบ|โจทย์|หน้า|บทที่|แบบฝึกหัด|อาจารย์|ครู|วิชา|โฟลเดอร์)/.test(
+        value,
+      );
+    if (hasHomeworkIntent) return null;
+
+    if (/^(?:สวัสดี|หวัดดี|ฮัลโหล|ดีจ้า|ดีครับ|ดีค่ะ)/.test(value)) {
+      return "หวัดดีจ้า ✨ วันนี้เป็นไงบ้าง มีอะไรให้พี่จินนี่ช่วยไหม";
+    }
+    if (/ขอบคุณ|ขอบใจ/.test(value)) {
+      return "ยินดีเสมอจ้า พี่จินนี่อยู่ตรงนี้นะ ✨";
+    }
+    if (/(วันนี้|ช่วงนี้)?\s*(เหนื่อย|เครียด|ง่วง|ท้อ|ไม่ไหว)/.test(value)) {
+      return "โอ๋ ๆ พักก่อนก็ได้นะ หายใจลึก ๆ แล้วค่อยลุยทีละอย่าง พี่จินนี่อยู่เป็นเพื่อนจ้า";
+    }
+    if (/ทำอะไรอยู่|เป็นไงบ้าง|คุยเล่น/.test(value)) {
+      return "พี่จินนี่กำลังรอคุยกับเราอยู่เลยจ้า อยากคุยเรื่องอะไรดี ✨";
+    }
+    return null;
+  }
+
   // สร้างโฟลเดอร์ให้วิชาที่ยังไม่มี (เช่นพิมพ์ "ฟิ" ก็ได้โฟลเดอร์ "ฟิสิกส์" เอง)
   function ensureFolders(names: string[]): {
     canonical: Map<string, string>;
@@ -633,6 +656,15 @@ export function GenieApp() {
       setMessages((prev) => [
         ...prev,
         { id: uid(), role: "genie", text: answer },
+      ]);
+      return;
+    }
+
+    const casual = casualReply(text);
+    if (casual) {
+      setMessages((prev) => [
+        ...prev,
+        { id: uid(), role: "genie", text: casual },
       ]);
       return;
     }
