@@ -25,22 +25,28 @@ import {
 } from "@/lib/theme";
 import {
   addTasks,
+  claimGuestData,
   deleteTask,
+  getSupabase,
   listTasks,
   ownerToken,
   renameTaskSubject,
   setTaskDone,
+  signInWith,
+  signOutNow,
+  toAccountUser,
+  type AccountUser,
 } from "@/lib/supabase";
 import { ChatPanel, type ChatMessage } from "./ChatPanel";
 import { FolderDialog } from "./FolderDialog";
 import { GenieFace } from "./GenieFace";
+import { LoginPanel } from "./LoginPanel";
 import { Sidebar, type NavKey } from "./Sidebar";
 import { TaskRow } from "./TaskRow";
 import { CatFolderIcon } from "./icons";
 import {
   IconBell,
   IconClose,
-  IconLink,
   IconPencil,
   IconPlus,
   IconSearch,
@@ -163,6 +169,7 @@ export function GenieApp() {
   const [pop, setPop] = useState<"bell" | "account" | null>(null);
   const [roomCode, setRoomCode] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [user, setUser] = useState<AccountUser | null>(null);
 
   const chatInputRef = useRef<HTMLInputElement>(null);
   const mounted = useMounted();
@@ -188,6 +195,54 @@ export function GenieApp() {
       alive = false;
     };
   }, []);
+
+  // ฟังสถานะล็อกอิน Google / LINE
+  useEffect(() => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    let alive = true;
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (alive) setUser(toAccountUser(data.session?.user));
+      })
+      .catch(() => {});
+
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (alive) setUser(toAccountUser(session?.user));
+    });
+
+    return () => {
+      alive = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
+  const userId = user?.id ?? null;
+
+  // พอล็อกอินแล้ว งานที่จดไว้ก่อนล็อกอินจะย้ายเข้าบัญชีให้ แล้วโหลดของบัญชีมาแสดง
+  useEffect(() => {
+    if (!userId) return;
+
+    let alive = true;
+
+    (async () => {
+      await claimGuestData(userId);
+      const [loadedTasks, loadedFolders] = await Promise.all([
+        listTasks(),
+        listFolders(),
+      ]);
+      if (!alive) return;
+      setTasks(loadedTasks);
+      setFolders(loadedFolders);
+    })().catch(() => {});
+
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
 
   function flash(message: string) {
     setToast(message);
@@ -442,6 +497,28 @@ export function GenieApp() {
     }
   }
 
+  async function handleSignIn(provider: "google" | "line") {
+    const label = provider === "google" ? "Google" : "LINE";
+    const error = await signInWith(provider);
+    if (error) {
+      flash(`ยังเปิดล็อกอิน ${label} ไม่ได้: ${error}`);
+      return;
+    }
+    setPop(null);
+  }
+
+  async function handleSignOut() {
+    await signOutNow();
+    setPop(null);
+    const [loadedTasks, loadedFolders] = await Promise.all([
+      listTasks(),
+      listFolders(),
+    ]);
+    setTasks(loadedTasks);
+    setFolders(loadedFolders);
+    flash("ออกจากระบบแล้ว งานในเครื่องยังอยู่");
+  }
+
   const activeFilterLabel =
     filter?.kind === "folder"
       ? `โฟลเดอร์: ${filter.name}`
@@ -588,11 +665,17 @@ export function GenieApp() {
                   setRoomCode(ownerToken());
                   setPop(pop === "account" ? null : "account");
                 }}
-                aria-label="บัญชีและลิงก์ห้อง"
+                aria-label={user ? "บัญชีของฉัน" : "เข้าสู่ระบบหรือลิงก์ห้อง"}
                 aria-expanded={pop === "account"}
-                className="focus-ring grid h-9 w-9 place-items-center rounded-full bg-yellow text-[12px] font-bold text-navy"
+                className={`focus-ring grid h-9 w-9 place-items-center rounded-full text-[12px] font-bold transition ${
+                  user
+                    ? "bg-navy text-paper ring-2 ring-blue-soft"
+                    : "bg-yellow text-navy"
+                }`}
               >
-                จ
+                {user
+                  ? (user.name ?? user.email ?? "จ").trim().charAt(0) || "จ"
+                  : "จ"}
               </button>
 
               {pop === "account" && (
@@ -602,27 +685,17 @@ export function GenieApp() {
                     onClick={() => setPop(null)}
                     aria-hidden="true"
                   />
-                  <div className="soft-shadow absolute right-0 top-11 z-30 w-[290px] rounded-2xl border border-line bg-paper p-4">
-                    <p className="text-[12px] font-semibold text-navy">
-                      ลิงก์ห้องนี้
-                    </p>
-                    <p className="mt-1 text-[11px] leading-relaxed text-muted">
-                      เปิดลิงก์เดียวกันบนมือถือ จะเห็นการบ้านชุดเดียวกัน
-                    </p>
-                    <p className="mt-2 truncate rounded-lg bg-cream px-2.5 py-1.5 text-[10.5px] text-muted">
-                      ?room={roomCode || "..."}
-                    </p>
-                    <button
-                      onClick={() => {
-                        void copyRoomLink();
-                        setPop(null);
-                      }}
-                      className="focus-ring mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl bg-navy px-3 py-2 text-[11.5px] font-semibold text-paper hover:bg-navy-deep"
-                    >
-                      <IconLink size={13} />
-                      คัดลอกลิงก์ห้อง
-                    </button>
-                  </div>
+                  <LoginPanel
+                    user={user}
+                    onGoogle={() => void handleSignIn("google")}
+                    onLine={() => void handleSignIn("line")}
+                    onSignOut={() => void handleSignOut()}
+                    roomCode={roomCode}
+                    onCopyLink={() => {
+                      void copyRoomLink();
+                      setPop(null);
+                    }}
+                  />
                 </>
               )}
             </div>

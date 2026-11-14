@@ -42,6 +42,75 @@ export function getSupabase(): SupabaseClient | null {
   return client;
 }
 
+export type AccountUser = {
+  id: string;
+  email: string | null;
+  name: string | null;
+};
+
+export function toAccountUser(
+  user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> } | null | undefined,
+): AccountUser | null {
+  if (!user) return null;
+  const meta = user.user_metadata ?? {};
+  const name =
+    (typeof meta.full_name === "string" && meta.full_name) ||
+    (typeof meta.name === "string" && meta.name) ||
+    (typeof meta.display_name === "string" && meta.display_name) ||
+    null;
+  return { id: user.id, email: user.email ?? null, name };
+}
+
+// ล็อกอินด้วย Google หรือ LINE ครั้งแรกจะสมัครบัญชีให้เลย
+export async function signInWith(provider: "google" | "line"): Promise<string | null> {
+  const supabase = getSupabase();
+  if (!supabase) return "ยังไม่ได้ตั้งค่า Supabase";
+
+  // Google ใช้ของ Supabase ที่มีให้เลย ส่วน LINE ต้องเพิ่มเป็น custom OIDC ก่อน
+  const providerId = provider === "google" ? "google" : "custom:line";
+
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: providerId,
+    options: {
+      redirectTo: `${window.location.origin}${window.location.pathname}`,
+    },
+  });
+
+  return error?.message ?? null;
+}
+
+export async function signOutNow(): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  await supabase.auth.signOut();
+}
+
+export async function currentUserId(): Promise<string | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user.id ?? null;
+}
+
+// งานที่จดไว้ตอนยังไม่ล็อกอิน ย้ายเข้าบัญชีให้อัตโนมัติครั้งแรก
+export async function claimGuestData(userId: string): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+
+  const token = ownerToken();
+  await supabase
+    .from("tasks")
+    .update({ user_id: userId })
+    .eq("owner_token", token)
+    .is("user_id", null);
+
+  await supabase
+    .from("folders")
+    .update({ user_id: userId })
+    .eq("owner_token", token)
+    .is("user_id", null);
+}
+
 function readLocal(): Task[] {
   try {
     const raw = window.localStorage.getItem(LOCAL_TASKS);
@@ -50,9 +119,7 @@ function readLocal(): Task[] {
   } catch {
     return [];
   }
-}
-
-function writeLocal(tasks: Task[]) {
+}function writeLocal(tasks: Task[]) {
   try {
     window.localStorage.setItem(LOCAL_TASKS, JSON.stringify(tasks));
   } catch {
@@ -89,10 +156,12 @@ export async function addTasks(tasks: Task[]): Promise<void> {
   }
 
   const token = ownerToken();
+  const userId = await currentUserId();
   const { error } = await supabase.from("tasks").insert(
     tasks.map((t) => ({
       id: t.id,
       owner_token: token,
+      user_id: userId,
       title: t.title,
       subject: t.subject,
       due: t.due,

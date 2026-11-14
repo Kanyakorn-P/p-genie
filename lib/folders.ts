@@ -1,4 +1,4 @@
-import { getSupabase, ownerToken } from "./supabase";
+import { currentUserId, getSupabase, ownerToken } from "./supabase";
 import { FOLDER_COLOR_ORDER, isFolderColor, type Folder } from "./theme";
 
 const LOCAL_FOLDERS = "p-genie-folders-v1";
@@ -59,9 +59,11 @@ export async function insertFolder(folder: Folder): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) return;
 
+  const userId = await currentUserId();
   await supabase.from("folders").insert({
     id: folder.id,
     owner_token: ownerToken(),
+    user_id: userId,
     name: folder.name,
     color: folder.color,
   });
