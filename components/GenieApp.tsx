@@ -177,6 +177,7 @@ export function GenieApp() {
   const [user, setUser] = useState<AccountUser | null>(null);
   const [thinking, setThinking] = useState(false);
   const [pendingDueTaskIds, setPendingDueTaskIds] = useState<string[]>([]);
+  const [contactOpen, setContactOpen] = useState(false);
 
   const chatInputRef = useRef<HTMLInputElement>(null);
   const mounted = useMounted();
@@ -1592,14 +1593,59 @@ export function GenieApp() {
             </aside>
           )}
         </div>
-        <footer className="border-t border-line bg-paper/75 px-6 py-4 text-center text-[11px] text-muted">
+        <footer className="relative border-t border-line bg-paper/75 px-6 py-4 text-center text-[11px] text-muted">
           <span>มีคำแนะนำหรืออยากคุยกับเราไหม? </span>
-          <a
-            href="mailto:sapmy.ass@gmail.com"
+          <button
+            onClick={() => setContactOpen((open) => !open)}
             className="font-semibold text-navy underline decoration-line underline-offset-2 transition hover:text-blue"
+            aria-expanded={contactOpen}
           >
             Contact us
-          </a>
+          </button>
+          {contactOpen && (
+            <>
+              <button
+                aria-label="ปิดช่องทางติดต่อ"
+                onClick={() => setContactOpen(false)}
+                className="fixed inset-0 z-20 cursor-default"
+              />
+              <div className="soft-shadow absolute bottom-14 left-1/2 z-30 w-[280px] -translate-x-1/2 rounded-2xl border border-line bg-paper p-3 text-left">
+                <p className="text-[12px] font-bold text-navy">Contact us</p>
+                <p className="mt-1 text-[10.5px] text-muted">
+                  เลือกช่องทางที่สะดวกได้เลยน้า
+                </p>
+                <div className="mt-3 space-y-2">
+                  <a
+                    href="https://www.instagram.com/mobius_gotta_go/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between rounded-xl bg-cream px-3 py-2 text-[11px] font-semibold text-navy transition hover:bg-pink-100"
+                  >
+                    <span>Instagram</span>
+                    <span className="text-muted">เปิดลิงก์ ↗</span>
+                  </a>
+                  <a
+                    href="https://www.facebook.com/share/1JUq5ew4qh/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between rounded-xl bg-cream px-3 py-2 text-[11px] font-semibold text-navy transition hover:bg-blue-soft"
+                  >
+                    <span>Facebook</span>
+                    <span className="text-muted">เปิดลิงก์ ↗</span>
+                  </a>
+                  <a
+                    href="https://line.me/R/ti/p/~nongpang2009"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between rounded-xl bg-cream px-3 py-2 text-[11px] font-semibold text-navy transition hover:bg-green-soft"
+                  >
+                    <span>LINE: nongpang2009</span>
+                    <span className="text-muted">เปิดแชท ↗</span>
+                  </a>
+                </div>
+              </div>
+            </>
+          )}
         </footer>
       </div>
 
