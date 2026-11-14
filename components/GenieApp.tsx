@@ -1305,8 +1305,6 @@ export function GenieApp() {
               </div>
             </section>
 
-            <CalendarView tasks={tasks} />
-
             <section id="reminder" className="scroll-mt-24">
               <div className="surface soft-shadow p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1396,6 +1394,8 @@ export function GenieApp() {
                 </div>
               </div>
             </section>
+
+            <CalendarView tasks={tasks} />
 
             {!wide && (
               <section id="chat" className="scroll-mt-24">
