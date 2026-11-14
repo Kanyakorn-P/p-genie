@@ -14,7 +14,7 @@ type GenieResult = {
 
 const FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-2.5-flash"];
 
-const ATTEMPT_TIMEOUT_MS = 8000;
+const ATTEMPT_TIMEOUT_MS = 6000;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -22,6 +22,17 @@ function sleep(ms: number) {
 
 // ถาม Google ว่าตอนนี้มีรุ่นไหนใช้ได้บ้าง (รุ่นเก่าถูกปิดไปเรื่อย ๆ)
 let modelCache: { names: string[]; at: number } | null = null;
+
+// รุ่นที่ลงท้าย -latest คือชื่อเล่นที่ Google อัปเดตให้เอง ไม่ตายง่าย
+// flash-lite เร็วที่สุดเลยจัดไว้ก่อน
+function scoreModel(name: string) {
+  let score = 0;
+  if (name.endsWith("-latest")) score += 100;
+  if (name.includes("flash-lite")) score += 40;
+  if (name.includes("preview")) score -= 20;
+  if (name === "gemini-2.5-flash") score += 10;
+  return score;
+}
 
 async function pickModels(key: string): Promise<string[]> {
   if (modelCache && Date.now() - modelCache.at < 10 * 60 * 1000) {
@@ -44,9 +55,17 @@ async function pickModels(key: string): Promise<string[]> {
       const names = (json.models ?? [])
         .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
         .map((m) => (m.name ?? "").replace(/^models\//, ""))
-        .filter((m) => m.includes("flash") && !m.includes("thinking"));
+        .filter(
+          (m) =>
+            m.includes("flash") &&
+            !m.includes("tts") &&
+            !m.includes("image") &&
+            !m.includes("thinking"),
+        )
+        .sort((a, b) => scoreModel(b) - scoreModel(a));
+
       if (names.length > 0) {
-        modelCache = { names: names.slice(0, 4), at: Date.now() };
+        modelCache = { names: names.slice(0, 5), at: Date.now() };
         return modelCache.names;
       }
     }
