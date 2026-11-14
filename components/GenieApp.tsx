@@ -1759,7 +1759,7 @@ export function GenieApp() {
             </button>
           ))}
         </nav>
-        <footer className="relative border-t border-line bg-paper/75 px-6 py-4 text-center text-[11px] text-muted">
+        <footer className="relative border-t border-line bg-paper/75 px-6 py-4 pb-24 text-center text-[11px] text-muted lg:pb-4">
           <span>มีคำแนะนำหรืออยากคุยกับเราไหม? </span>
           <button
             onClick={() => setContactOpen((open) => !open)}
@@ -1775,7 +1775,7 @@ export function GenieApp() {
                 onClick={() => setContactOpen(false)}
                 className="fixed inset-0 z-20 cursor-default"
               />
-              <div className="soft-shadow absolute bottom-14 left-1/2 z-30 w-[280px] -translate-x-1/2 rounded-2xl border border-line bg-paper p-3 text-left">
+              <div className="soft-shadow absolute bottom-24 left-1/2 z-30 w-[min(280px,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-line bg-paper p-3 text-left sm:bottom-14">
                 <p className="text-[12px] font-bold text-navy">Contact us</p>
                 <p className="mt-1 text-[10.5px] text-muted">
                   เลือกช่องทางที่สะดวกได้เลยน้า
