@@ -257,6 +257,7 @@ export function GenieApp() {
   const [thinking, setThinking] = useState(false);
   const [pendingDueTaskIds, setPendingDueTaskIds] = useState<string[]>([]);
   const [contactOpen, setContactOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
   const [onboarding, setOnboarding] = useState<"ask" | "guide" | null>("ask");
   const [onboardingStep, setOnboardingStep] = useState(0);
   const onboardingDismissed = useSyncExternalStore(
@@ -1044,7 +1045,7 @@ export function GenieApp() {
   );
 
   return (
-    <div className="flex min-h-screen bg-cream">
+    <div className={`${darkMode ? "dark" : ""} flex min-h-screen bg-cream`}>
       <Sidebar
         folders={folders}
         counts={counts}
@@ -1094,6 +1095,13 @@ export function GenieApp() {
           </label>
 
           <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setDarkMode((enabled) => !enabled)}
+              aria-label={darkMode ? "เปลี่ยนเป็นโหมดสว่าง" : "เปลี่ยนเป็นโหมดมืด"}
+              className="focus-ring grid h-9 w-9 place-items-center rounded-full border border-line bg-paper text-[16px] text-navy transition hover:border-blue"
+            >
+              {darkMode ? "☀" : "◐"}
+            </button>
             <button
               onClick={focusChat}
               className="focus-ring flex items-center gap-1.5 rounded-full bg-navy px-3.5 py-2 text-[12px] font-semibold text-paper transition hover:bg-navy-deep"

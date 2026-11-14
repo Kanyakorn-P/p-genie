@@ -30,6 +30,20 @@
   --font-mali: var(--font-heading);
 }
 
+.dark {
+  --color-cream: #18202b;
+  --color-cream-deep: #253040;
+  --color-paper: #202b3a;
+  --color-line: #3b485b;
+  --color-ink: #eef3f8;
+  --color-muted: #aab6c5;
+  --color-blue-soft: #263f68;
+  --color-yellow-soft: #514721;
+  --color-green-soft: #244333;
+  --color-red-soft: #512f34;
+  --color-plum-soft: #3d3155;
+}
+
 @layer base {
   body {
     background-color: var(--color-cream);
