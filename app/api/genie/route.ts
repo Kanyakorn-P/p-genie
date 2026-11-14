@@ -158,8 +158,8 @@ export async function POST(request: Request) {
     !/(และ|กับ|หลาย|แยก|โฟลเดอร์|ช่วยจัด|ช่วยคิด|อะไรบ้าง|ไหนบ้าง)/.test(text);
   // งานสั้นใช้ Lite ให้ไว งานหลายเงื่อนไขใช้รุ่นเต็มให้เข้าใจแม่นกว่า
   const models = quickRequest
-    ? ["gemini-2.5-flash-lite", "gemini-2.5-flash"]
-    : ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+    ? ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.1-flash-lite"]
+    : ["gemini-flash-latest", "gemini-3.1-flash-lite", "gemini-flash-lite-latest"];
 
   // ลองรุ่นที่เบากว่า + ลองซ้ำอีกรอบ เผื่อ Google ตอบ 503 เพราะคนใช้เยอะ
   for (let round = 0; round < 2; round += 1) {
