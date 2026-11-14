@@ -99,10 +99,11 @@ export function CalendarView({ tasks }: CalendarViewProps) {
   );
   const today = mounted ? startOfDay(new Date()) : null;
   const [monthState, setMonthState] = useState<number | null>(null);
+  const [yearState, setYearState] = useState<number | null>(null);
   const [selectedState, setSelectedState] = useState("");
   const month = monthState ?? today?.getMonth() ?? 0;
   const selected = selectedState || (today ? key(today) : "");
-  const year = today?.getFullYear() ?? 0;
+  const year = yearState ?? today?.getFullYear() ?? 0;
 
   const datedTasks = useMemo(
     () =>
@@ -142,7 +143,7 @@ export function CalendarView({ tasks }: CalendarViewProps) {
             เลื่อนดูงานในปีนี้ แล้วกดวันที่เพื่อดูรายละเอียด
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="relative flex items-center gap-2">
           <button
             onClick={() => setMonthState((value) => Math.max(0, (value ?? month) - 1))}
             disabled={month === 0}
@@ -151,9 +152,34 @@ export function CalendarView({ tasks }: CalendarViewProps) {
           >
             ‹
           </button>
-          <span className="min-w-[132px] text-center text-[12px] font-bold text-navy">
-            {MONTHS[month]} {year + 543}
-          </span>
+          <label className="relative">
+            <span className="sr-only">เลือกเดือนและปี</span>
+            <select
+              value={`${year}-${month}`}
+              onChange={(event) => {
+                const [nextYear, nextMonth] = event.target.value.split("-").map(Number);
+                setYearState(nextYear);
+                setMonthState(nextMonth);
+                setSelectedState(key(new Date(nextYear, nextMonth, 1)));
+              }}
+              className="min-w-[156px] cursor-pointer appearance-none rounded-full border border-line bg-paper px-4 py-2 text-center text-[12px] font-bold text-navy outline-none transition hover:border-blue focus:border-blue"
+              aria-label="เลือกเดือนและปี"
+            >
+              {Array.from(
+                { length: 7 },
+                (_, index) => year - 3 + index,
+              ).flatMap((optionYear) =>
+                MONTHS.map((monthName, monthIndex) => (
+                  <option
+                    key={`${optionYear}-${monthIndex}`}
+                    value={`${optionYear}-${monthIndex}`}
+                  >
+                    {monthName} {optionYear + 543}
+                  </option>
+                )),
+              )}
+            </select>
+          </label>
           <button
             onClick={() => setMonthState((value) => Math.min(11, (value ?? month) + 1))}
             disabled={month === 11}
