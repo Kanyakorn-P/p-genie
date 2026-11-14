@@ -11,16 +11,19 @@ export type AiResult = {
   folders: string[];
 };
 
+export type AiMode = "economy" | "balanced";
+
 // ถามพี่จินนี่ (Gemini) ผ่าน API ในแอป ถ้าพลาดคืน null ให้ไปใช้กฎในเครื่องแทน
 export async function askGenie(
   text: string,
   folders: string[],
+  mode: AiMode = "economy",
 ): Promise<AiResult | null> {
   try {
     const res = await fetch("/api/genie", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, folders }),
+      body: JSON.stringify({ text, folders, mode }),
       signal: AbortSignal.timeout(20000),
     });
 

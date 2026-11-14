@@ -38,7 +38,7 @@ import {
   updateTaskDue,
   type AccountUser,
 } from "@/lib/supabase";
-import { askGenie } from "@/lib/genie-ai";
+import { askGenie, type AiMode } from "@/lib/genie-ai";
 import { ChatPanel, type ChatMessage } from "./ChatPanel";
 import { AccountAvatar } from "./AccountAvatar";
 import { CalendarView } from "./CalendarView";
@@ -91,6 +91,15 @@ const subscribeOnboarding = (callback: () => void) => {
   window.addEventListener("storage", callback);
   return () => window.removeEventListener("storage", callback);
 };
+const AI_MODE_KEY = "p-genie-ai-mode-v1";
+const subscribeAiMode = (callback: () => void) => {
+  window.addEventListener("p-genie-ai-mode", callback);
+  return () => window.removeEventListener("p-genie-ai-mode", callback);
+};
+const getAiMode = (): AiMode =>
+  window.localStorage.getItem(AI_MODE_KEY) === "balanced"
+    ? "balanced"
+    : "economy";
 const getOnboardingDismissed = () =>
   window.localStorage.getItem(ONBOARDING_KEY) === "1";
 
@@ -277,6 +286,7 @@ export function GenieApp() {
   const [pendingDueTaskIds, setPendingDueTaskIds] = useState<string[]>([]);
   const [contactOpen, setContactOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [aiModeOpen, setAiModeOpen] = useState(false);
   const [onboarding, setOnboarding] = useState<"ask" | "guide" | null>("ask");
   const [onboardingStep, setOnboardingStep] = useState(0);
   const onboardingDismissed = useSyncExternalStore(
@@ -284,6 +294,16 @@ export function GenieApp() {
     getOnboardingDismissed,
     () => false,
   );
+  const aiMode = useSyncExternalStore(
+    subscribeAiMode,
+    getAiMode,
+    () => "economy" as AiMode,
+  );
+
+  function changeAiMode(mode: AiMode) {
+    window.localStorage.setItem(AI_MODE_KEY, mode);
+    window.dispatchEvent(new Event("p-genie-ai-mode"));
+  }
 
   function closeOnboarding() {
     try {
@@ -907,6 +927,7 @@ export function GenieApp() {
     const ai = await askGenie(
       text,
       folders.map((f) => f.name),
+      aiMode,
     );
 
     setThinking(false);
@@ -1119,6 +1140,70 @@ export function GenieApp() {
           </label>
 
           <div className="ml-auto flex items-center gap-2">
+            <div className="relative">
+              <button
+                onClick={() => setAiModeOpen((open) => !open)}
+                aria-label="เลือกโหมด AI"
+                aria-expanded={aiModeOpen}
+                className="focus-ring rounded-full border border-line bg-paper px-3 py-2 text-[11px] font-bold text-navy transition hover:border-blue"
+              >
+                AI
+              </button>
+              {aiModeOpen && (
+                <>
+                  <button
+                    aria-label="ปิดเมนูโหมด AI"
+                    onClick={() => setAiModeOpen(false)}
+                    className="fixed inset-0 z-20 cursor-default"
+                  />
+                  <div className="soft-shadow absolute right-0 top-11 z-30 w-[220px] rounded-2xl border border-line bg-paper p-3">
+                    <p className="text-[12px] font-bold text-navy">โหมด AI</p>
+                    <p className="mt-1 text-[10.5px] leading-relaxed text-muted">
+                      ค่าเริ่มต้นเป็นโหมดประหยัด เปลี่ยนได้ทุกเมื่อ
+                    </p>
+                    <div className="mt-3 space-y-1.5">
+                      {[
+                        {
+                          mode: "economy" as AiMode,
+                          title: "ประหยัด",
+                          detail: "เร็วและใช้โควตาน้อย",
+                        },
+                        {
+                          mode: "balanced" as AiMode,
+                          title: "สมดุล",
+                          detail: "เข้าใจข้อความซับซ้อนขึ้น",
+                        },
+                      ].map((option) => (
+                        <button
+                          key={option.mode}
+                          onClick={() => {
+                            changeAiMode(option.mode);
+                            setAiModeOpen(false);
+                          }}
+                          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition ${
+                            aiMode === option.mode
+                              ? "bg-blue-soft text-navy"
+                              : "bg-cream text-ink hover:bg-cream-deep"
+                          }`}
+                        >
+                          <span>
+                            <span className="block text-[11px] font-semibold">
+                              {option.title}
+                            </span>
+                            <span className="block text-[9.5px] text-muted">
+                              {option.detail}
+                            </span>
+                          </span>
+                          {aiMode === option.mode && (
+                            <span className="text-[12px]">✓</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
             <button
               onClick={() => setDarkMode((enabled) => !enabled)}
               aria-label={darkMode ? "เปลี่ยนเป็นโหมดสว่าง" : "เปลี่ยนเป็นโหมดมืด"}

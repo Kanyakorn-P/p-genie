@@ -111,7 +111,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "ยังไม่ได้ใส่ GEMINI_API_KEY" }, { status: 503 });
   }
 
-  let body: { text?: unknown; folders?: unknown };
+  let body: { text?: unknown; folders?: unknown; mode?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -122,6 +122,7 @@ export async function POST(request: Request) {
   if (!text) {
     return NextResponse.json({ error: "ยังไม่มีข้อความ" }, { status: 400 });
   }
+  const mode = body.mode === "balanced" ? "balanced" : "economy";
 
   const folders = Array.isArray(body.folders)
     ? body.folders
@@ -157,9 +158,12 @@ export async function POST(request: Request) {
     text.length <= 90 &&
     !/(และ|กับ|หลาย|แยก|โฟลเดอร์|ช่วยจัด|ช่วยคิด|อะไรบ้าง|ไหนบ้าง)/.test(text);
   // งานสั้นใช้ Lite ให้ไว งานหลายเงื่อนไขใช้รุ่นเต็มให้เข้าใจแม่นกว่า
-  const models = quickRequest
-    ? ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.1-flash-lite"]
-    : ["gemini-flash-latest", "gemini-3.1-flash-lite", "gemini-flash-lite-latest"];
+  const models =
+    mode === "balanced"
+      ? ["gemini-flash-latest", "gemini-3.1-flash-lite", "gemini-flash-lite-latest"]
+      : quickRequest
+        ? ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.1-flash-lite"]
+        : ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.1-flash-lite"];
 
   // ลองรุ่นที่เบากว่า + ลองซ้ำอีกรอบ เผื่อ Google ตอบ 503 เพราะคนใช้เยอะ
   for (let round = 0; round < 2; round += 1) {
