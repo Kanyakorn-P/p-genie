@@ -1554,7 +1554,7 @@ export function GenieApp() {
                               {folderCount}
                             </span>
                           </div>
-                          <p className="mt-3 truncate text-[14px] font-bold text-navy">
+                           <p className="mt-3 truncate text-[14px] font-bold text-ink">
                             {folder.name}
                           </p>
                           <p className="text-[10.5px] text-navy/60">
