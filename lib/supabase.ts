@@ -62,9 +62,36 @@ export function toAccountUser(
 }
 
 // ล็อกอินด้วย Google หรือ LINE ครั้งแรกจะสมัครบัญชีให้เลย
+let providerCache: Record<string, boolean> | null = null;
+
+// เช็กก่อนว่าผู้ให้บริการล็อกอินถูกเปิดใน Supabase แล้วหรือยัง
+export async function enabledProviders(): Promise<Record<string, boolean>> {
+  if (providerCache) return providerCache;
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) return {};
+
+  try {
+    const res = await fetch(`${url}/auth/v1/settings`, {
+      headers: { apikey: key },
+    });
+    const json = (await res.json()) as { external?: Record<string, boolean> };
+    providerCache = json.external ?? {};
+  } catch {
+    providerCache = {};
+  }
+
+  return providerCache;
+}
+
 export async function signInWith(provider: "google" | "line"): Promise<string | null> {
   const supabase = getSupabase();
   if (!supabase) return "ยังไม่ได้ตั้งค่า Supabase";
+
+  const enabled = await enabledProviders();
+  const providerKey = provider === "google" ? "google" : "custom:line";
+  if (!enabled[providerKey]) return "provider is not enabled";
 
   // Google ใช้ของ Supabase ที่มีให้เลย ส่วน LINE ต้องเพิ่มเป็น custom OIDC ก่อน
   const providerId = provider === "google" ? "google" : "custom:line";
