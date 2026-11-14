@@ -64,6 +64,32 @@ const START_MESSAGE: ChatMessage = {
   text: "สวัสดีจ้า พี่จินนี่เอง ✨ พิมพ์การบ้านมาหลายวิชาพร้อมกันได้เลยน้า เช่น ฟิสิกส์หน้า 45 ส่งพรุ่งนี้ ไทยแต่งกลอน 2 บท ส่งศุกร์หน้า",
 };
 
+const ONBOARDING_KEY = "p-genie-onboarding-dismissed-v1";
+const ONBOARDING_STEPS = [
+  {
+    title: "พิมพ์การบ้านแบบที่พูดจริงได้เลย",
+    text: "เช่น “ฟิสิกส์หน้า 45 ส่งพรุ่งนี้” พี่จินนี่จะแยกวิชา รายละเอียด และวันส่งให้",
+  },
+  {
+    title: "ไม่ระบุวันส่งก็ได้",
+    text: "พี่จินนี่จะถามต่อว่า “งานนี้ส่งวันไหนเหรอ?” แล้วเอาคำตอบไปเติมงานเดิมให้",
+  },
+  {
+    title: "โฟลเดอร์สร้างและจัดให้เอง",
+    text: "พิมพ์ “ฟิ” หรือ “วิทย์เรื่องเซลล์” ก็จะจับเข้าฟิสิกส์หรือชีววิทยาให้",
+  },
+  {
+    title: "ดูงานได้หลายแบบ",
+    text: "ใช้กำหนดการสัปดาห์นี้ ปฏิทินการบ้าน และค้นหางานที่ต้องส่งวันนี้ได้เลย",
+  },
+];
+const subscribeOnboarding = (callback: () => void) => {
+  window.addEventListener("storage", callback);
+  return () => window.removeEventListener("storage", callback);
+};
+const getOnboardingDismissed = () =>
+  window.localStorage.getItem(ONBOARDING_KEY) === "1";
+
 const CHIPS = [
   "ฟิสิกส์หน้า 45 ส่งพรุ่งนี้",
   "ไทยแต่งกลอน 2 บท ส่งศุกร์หน้า",
@@ -231,6 +257,22 @@ export function GenieApp() {
   const [thinking, setThinking] = useState(false);
   const [pendingDueTaskIds, setPendingDueTaskIds] = useState<string[]>([]);
   const [contactOpen, setContactOpen] = useState(false);
+  const [onboarding, setOnboarding] = useState<"ask" | "guide" | null>("ask");
+  const [onboardingStep, setOnboardingStep] = useState(0);
+  const onboardingDismissed = useSyncExternalStore(
+    subscribeOnboarding,
+    getOnboardingDismissed,
+    () => false,
+  );
+
+  function closeOnboarding() {
+    try {
+      window.localStorage.setItem(ONBOARDING_KEY, "1");
+    } catch {
+      // ไม่เป็นไร ถ้าบันทึกไม่ได้
+    }
+    setOnboarding(null);
+  }
 
   const chatInputRef = useRef<HTMLInputElement>(null);
   const mounted = useMounted();
@@ -1711,6 +1753,90 @@ export function GenieApp() {
           )}
         </footer>
       </div>
+
+      {mounted && !onboardingDismissed && onboarding && (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-navy/25 px-4 backdrop-blur-[2px]">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="onboarding-title"
+            className="soft-shadow w-full max-w-[420px] rounded-3xl border border-line bg-paper p-5"
+          >
+            {onboarding === "ask" ? (
+              <>
+                <div className="rounded-2xl bg-yellow-soft p-4">
+                  <p className="font-mali text-[20px] font-bold text-navy">
+                    ให้พี่จินนี่แนะนำไหม? ✨
+                  </p>
+                  <p className="mt-1 text-[12px] leading-relaxed text-muted">
+                    ใช้เวลาไม่ถึง 1 นาที จะได้รู้ว่าพิมพ์งานยังไงและดูงานตรงไหน
+                  </p>
+                </div>
+                <div className="mt-4 grid gap-2">
+                  <button
+                    onClick={() => setOnboarding("guide")}
+                    className="focus-ring rounded-2xl bg-navy px-4 py-3 text-[12px] font-semibold text-paper transition hover:bg-navy-deep"
+                  >
+                    ต้องการคำแนะนำ
+                  </button>
+                  <button
+                    onClick={closeOnboarding}
+                    className="focus-ring rounded-2xl border border-line px-4 py-3 text-[12px] font-semibold text-muted transition hover:bg-cream"
+                  >
+                    ไม่ต้องการแนะนำ
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="rounded-full bg-blue-soft px-3 py-1 text-[10px] font-bold text-navy">
+                    ขั้นตอนที่ {onboardingStep + 1} / {ONBOARDING_STEPS.length}
+                  </span>
+                  <button
+                    onClick={closeOnboarding}
+                    className="focus-ring rounded-full px-2 py-1 text-[11px] text-muted hover:text-navy"
+                  >
+                    ข้าม
+                  </button>
+                </div>
+                <h2 id="onboarding-title" className="mt-5 text-[20px] font-bold text-navy">
+                  {ONBOARDING_STEPS[onboardingStep].title}
+                </h2>
+                <p className="mt-2 min-h-[58px] text-[12px] leading-relaxed text-muted">
+                  {ONBOARDING_STEPS[onboardingStep].text}
+                </p>
+                <div className="mt-5 flex items-center justify-between">
+                  <div className="flex gap-1">
+                    {ONBOARDING_STEPS.map((_, index) => (
+                      <span
+                        key={index}
+                        className={`h-1.5 w-5 rounded-full ${
+                          index === onboardingStep ? "bg-blue" : "bg-cream-deep"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (onboardingStep === ONBOARDING_STEPS.length - 1) {
+                        closeOnboarding();
+                      } else {
+                        setOnboardingStep((step) => step + 1);
+                      }
+                    }}
+                    className="focus-ring rounded-full bg-navy px-4 py-2 text-[11.5px] font-semibold text-paper hover:bg-navy-deep"
+                  >
+                    {onboardingStep === ONBOARDING_STEPS.length - 1
+                      ? "เริ่มใช้งาน"
+                      : "ถัดไป"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {dialog && (
         <FolderDialog
