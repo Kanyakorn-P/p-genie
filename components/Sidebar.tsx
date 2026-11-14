@@ -22,6 +22,7 @@ type SidebarProps = {
   activeNav: NavKey;
   activeFolderId: string | null;
   onNav: (key: NavKey) => void;
+  onHome: () => void;
   onFocusChat: () => void;
   onAddFolder: () => void;
   onEditFolder: (folder: Folder) => void;
@@ -43,6 +44,7 @@ export function Sidebar({
   activeNav,
   activeFolderId,
   onNav,
+  onHome,
   onFocusChat,
   onAddFolder,
   onEditFolder,
@@ -51,7 +53,11 @@ export function Sidebar({
 }: SidebarProps) {
   return (
     <aside className="sticky top-0 hidden h-screen w-[286px] shrink-0 flex-col border-r border-line bg-paper px-4 py-5 lg:flex">
-      <div className="flex items-center gap-3 px-2">
+      <button
+        onClick={onHome}
+        aria-label="กลับหน้าหลักพี่จินนี่"
+        className="focus-ring flex items-center gap-3 rounded-2xl px-2 text-left"
+      >
         <GenieFace size={48} />
         <div className="leading-tight">
           <p className="font-mali text-[19px] font-bold text-navy">พี่จินนี่</p>
@@ -59,7 +65,7 @@ export function Sidebar({
             AI TO-DO LIST AGENT
           </p>
         </div>
-      </div>
+      </button>
 
       <div className="mt-5 flex gap-2">
         <button

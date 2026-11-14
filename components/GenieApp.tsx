@@ -1057,6 +1057,7 @@ export function GenieApp() {
         activeNav={activeNav}
         activeFolderId={filter?.kind === "folder" ? filter.id : null}
         onNav={handleNav}
+        onHome={() => handleNav("home")}
         onFocusChat={focusChat}
         onAddFolder={() => setDialog({ mode: "create" })}
         onEditFolder={(folder) => setDialog({ mode: "edit", folder })}
@@ -1066,7 +1067,11 @@ export function GenieApp() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b border-line bg-cream/95 px-4 py-3 backdrop-blur sm:px-6">
-          <div className="flex items-center gap-2 lg:hidden">
+          <button
+            onClick={() => handleNav("home")}
+            aria-label="กลับหน้าหลักพี่จินนี่"
+            className="focus-ring flex items-center gap-2 rounded-2xl text-left lg:hidden"
+          >
             <GenieFace size={34} />
             <div className="leading-tight">
               <p className="font-mali text-[15px] font-bold text-navy">
@@ -1076,7 +1081,7 @@ export function GenieApp() {
                 AI TO-DO LIST
               </p>
             </div>
-          </div>
+          </button>
 
           <label className="order-3 flex min-w-0 flex-1 items-center gap-2 rounded-full border border-line bg-paper px-4 py-2 transition focus-within:border-blue sm:order-none">
             <IconSearch size={16} className="shrink-0 text-muted" />
