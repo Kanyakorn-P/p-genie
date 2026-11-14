@@ -482,6 +482,7 @@ export function GenieApp() {
     const requested = match[1]
       .replace(/^โฟลเดอร์\s*/i, "")
       .replace(/[“”"'`]/g, "")
+      .replace(/\s*(?:ให้ที|ให้หน่อย|หน่อย|ที|นะ|น้า)\s*$/i, "")
       .trim();
     if (!requested) return null;
 
@@ -493,6 +494,38 @@ export function GenieApp() {
       ) ??
       null
     );
+  }
+
+  function subjectOnlyCommand(text: string): string | null {
+    const cleaned = text
+      .trim()
+      .replace(/^โฟลเดอร์\s*/i, "")
+      .replace(/^(?:ช่วย\s*)?(?:สร้าง|เพิ่ม)\s*(?:โฟลเดอร์\s*)?/i, "")
+      .replace(/\s*(?:ให้ที|ให้หน่อย|หน่อย|ที|นะ|น้า)\s*$/i, "")
+      .trim();
+
+    const subjects: Record<string, string> = {
+      ฟิ: "ฟิสิกส์",
+      ฟิสิกส์: "ฟิสิกส์",
+      เลข: "คณิต",
+      คณิต: "คณิต",
+      คณิตศาสตร์: "คณิต",
+      ไทย: "ไทย",
+      ภาษาไทย: "ไทย",
+      อิ๊ง: "อังกฤษ",
+      อังกฤษ: "อังกฤษ",
+      ภาษาอังกฤษ: "อังกฤษ",
+      วิทย์: "วิทยาศาสตร์",
+      วิทยาศาสตร์: "วิทยาศาสตร์",
+      ชีวะ: "ชีววิทยา",
+      ชีววิทยา: "ชีววิทยา",
+      เซล: "ชีววิทยา",
+      เซลล์: "ชีววิทยา",
+      เคมี: "เคมี",
+      สังคม: "สังคม",
+    };
+
+    return subjects[cleaned] ?? null;
   }
 
   // สร้างโฟลเดอร์ให้วิชาที่ยังไม่มี (เช่นพิมพ์ "ฟิ" ก็ได้โฟลเดอร์ "ฟิสิกส์" เอง)
@@ -566,6 +599,23 @@ export function GenieApp() {
           text: deleted
             ? `ลบโฟลเดอร์ "${deleteTarget.name}" ให้แล้วนะ การบ้านข้างในยังอยู่ ไม่ได้ลบตาม`
             : "โอเค ยังไม่ลบโฟลเดอร์นะ",
+        },
+      ]);
+      return;
+    }
+
+    // พิมพ์แค่ชื่อวิชา เช่น "ฟิสิกส์" = ขอเปิด/สร้างโฟลเดอร์ ไม่ใช่การบ้าน
+    const subjectOnly = subjectOnlyCommand(text);
+    if (subjectOnly) {
+      const { created } = ensureFolders([subjectOnly]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uid(),
+          role: "genie",
+          text: created.length
+            ? `เพิ่มโฟลเดอร์ "${subjectOnly}" ให้แล้วน้า`
+            : `มีโฟลเดอร์ "${subjectOnly}" อยู่แล้วจ้า`,
         },
       ]);
       return;
