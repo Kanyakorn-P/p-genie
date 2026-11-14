@@ -13,69 +13,10 @@ type GenieResult = {
   folders: string[];
 };
 
-const FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-2.5-flash"];
-
 const ATTEMPT_TIMEOUT_MS = 6000;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// ถาม Google ว่าตอนนี้มีรุ่นไหนใช้ได้บ้าง (รุ่นเก่าถูกปิดไปเรื่อย ๆ)
-let modelCache: { names: string[]; at: number } | null = null;
-
-// รุ่นที่ลงท้าย -latest คือชื่อเล่นที่ Google อัปเดตให้เอง ไม่ตายง่าย
-// ใช้รุ่นเต็มก่อนเพื่อให้เข้าใจเจตนาได้ดีขึ้น แล้วค่อยถอยไป Lite ถ้ารุ่นหลักไม่ว่าง
-function scoreModel(name: string) {
-  let score = 0;
-  if (name === "gemini-2.5-flash") score += 220;
-  if (name.includes("3.1-flash")) score += 180;
-  if (name.endsWith("-latest")) score += 50;
-  if (name.includes("flash-lite")) score += 20;
-  if (name.includes("preview")) score -= 20;
-  return score;
-}
-
-async function pickModels(key: string): Promise<string[]> {
-  if (modelCache && Date.now() - modelCache.at < 10 * 60 * 1000) {
-    return modelCache.names;
-  }
-
-  try {
-    const res = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models?pageSize=100",
-      {
-        headers: { "x-goog-api-key": key },
-        signal: AbortSignal.timeout(6000),
-      },
-    );
-
-    if (res.ok) {
-      const json = (await res.json()) as {
-        models?: { name?: string; supportedGenerationMethods?: string[] }[];
-      };
-      const names = (json.models ?? [])
-        .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
-        .map((m) => (m.name ?? "").replace(/^models\//, ""))
-        .filter(
-          (m) =>
-            m.includes("flash") &&
-            !m.includes("tts") &&
-            !m.includes("image") &&
-            !m.includes("thinking"),
-        )
-        .sort((a, b) => scoreModel(b) - scoreModel(a));
-
-      if (names.length > 0) {
-        modelCache = { names: names.slice(0, 5), at: Date.now() };
-        return modelCache.names;
-      }
-    }
-  } catch {
-    // ใช้ลิสต์สำรองต่อ
-  }
-
-  return FALLBACK_MODELS;
 }
 
 const SYSTEM_PROMPT = `You are "พี่จินนี่" (P' Genie), a friendly Thai study buddy inside a homework to-do app.
@@ -203,6 +144,7 @@ export async function POST(request: Request) {
     ],
     generationConfig: {
       temperature: 0.3,
+      maxOutputTokens: 300,
       responseMimeType: "application/json",
       responseSchema: RESPONSE_SCHEMA,
     },
@@ -211,7 +153,13 @@ export async function POST(request: Request) {
   let lastError = "ต่อ Gemini ไม่ได้";
   const startedAt = Date.now();
   const BUDGET_MS = 15000;
-  const models = await pickModels(key);
+  const quickRequest =
+    text.length <= 90 &&
+    !/(และ|กับ|หลาย|แยก|โฟลเดอร์|ช่วยจัด|ช่วยคิด|อะไรบ้าง|ไหนบ้าง)/.test(text);
+  // งานสั้นใช้ Lite ให้ไว งานหลายเงื่อนไขใช้รุ่นเต็มให้เข้าใจแม่นกว่า
+  const models = quickRequest
+    ? ["gemini-2.5-flash-lite", "gemini-2.5-flash"]
+    : ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
 
   // ลองรุ่นที่เบากว่า + ลองซ้ำอีกรอบ เผื่อ Google ตอบ 503 เพราะคนใช้เยอะ
   for (let round = 0; round < 2; round += 1) {
