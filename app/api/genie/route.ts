@@ -25,13 +25,14 @@ function sleep(ms: number) {
 let modelCache: { names: string[]; at: number } | null = null;
 
 // รุ่นที่ลงท้าย -latest คือชื่อเล่นที่ Google อัปเดตให้เอง ไม่ตายง่าย
-// flash-lite เร็วที่สุดเลยจัดไว้ก่อน
+// ใช้รุ่นเต็มก่อนเพื่อให้เข้าใจเจตนาได้ดีขึ้น แล้วค่อยถอยไป Lite ถ้ารุ่นหลักไม่ว่าง
 function scoreModel(name: string) {
   let score = 0;
-  if (name.endsWith("-latest")) score += 100;
-  if (name.includes("flash-lite")) score += 40;
+  if (name === "gemini-2.5-flash") score += 220;
+  if (name.includes("3.1-flash")) score += 180;
+  if (name.endsWith("-latest")) score += 50;
+  if (name.includes("flash-lite")) score += 20;
   if (name.includes("preview")) score -= 20;
-  if (name === "gemini-2.5-flash") score += 10;
   return score;
 }
 
@@ -82,6 +83,7 @@ Your job: read what the student typed (usually Thai, sometimes messy or with typ
 
 Rules:
 - Reply in casual Thai, like an older friend. Warm, short, no em dashes, no formal words.
+- First decide the intent: casual conversation, homework entry, folder action, or question about existing homework. Never turn casual conversation into a task.
 - Split into separate tasks when the student mentions several homeworks in one message.
 - title: what the homework is, short and clear, keep important details (page, chapter, exercise numbers).
 - subject: pick the school subject. Use the full Thai name, never an abbreviation: คณิต, ไทย, อังกฤษ, วิทยาศาสตร์, ฟิสิกส์, เคมี, ชีววิทยา, สังคม, อื่นๆ. Prefer one of the student's folders when it fits.
@@ -89,6 +91,7 @@ Rules:
 - Understand topic clues: เซล or เซลล์ means ชีววิทยา, even when the student says วิทย์. For example, งานวิทย์เรื่องเซลล์ must go to ชีววิทยา.
 - due: copy the deadline wording from the message (วันนี้, พรุ่งนี้, มะรืนนี้, วันศุกร์, สัปดาห์หน้า, 12 ม.ค. ...). If there is no deadline, use "ยังไม่ระบุวันส่ง".
 - urgent: true only when due is วันนี้, พรุ่งนี้ or มะรืนนี้.
+- Words about weather, body, mood, or feelings such as ร้อน, หนาว, หิว, งง, เบื่อ, เหนื่อย, เครียด, ปวดหัว are conversation unless the student clearly connects them to homework.
 - folders: list of folder names that should exist in the app. Always include the subject of every task you return. If the student asks to organise or separate their homework into folders, add those folder names too. If the student mentions a folder that is not in their current list, add it. Use the same full Thai subject names. Never repeat a name that is already in the student's folder list.
 - Do not create a folder named อื่นๆ.
 - If the message is not about homework (greeting, question, complaint), return an empty tasks list and just answer them in reply.
