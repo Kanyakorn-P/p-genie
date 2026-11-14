@@ -1167,11 +1167,8 @@ export function GenieApp() {
                   </div>
                 </div>
 
-                <div className="relative hidden h-[132px] w-[132px] shrink-0 sm:block">
-                  <div className="dot-field absolute inset-0 rounded-[2rem] bg-yellow-soft" />
-                  <div className="absolute bottom-1 right-1 rounded-full bg-cream p-3 shadow-sm">
-                    <GenieFace size={92} />
-                  </div>
+                <div className="hidden shrink-0 rounded-full bg-cream p-3 sm:block">
+                  <GenieFace size={92} />
                 </div>
               </div>
             </section>

@@ -64,15 +64,6 @@
     outline-offset: 2px;
   }
 
-  .dot-field {
-    background-image: radial-gradient(
-      circle,
-      rgba(103, 99, 89, 0.38) 2px,
-      transparent 2.5px
-    );
-    background-size: 16px 16px;
-    mask-image: linear-gradient(135deg, transparent 0%, black 28%, black 100%);
-  }
 }
 
 /* แถบเลื่อนบาง ๆ ให้เข้ากับพื้นครีม */
