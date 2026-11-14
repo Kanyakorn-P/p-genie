@@ -50,7 +50,11 @@ import { TaskRow } from "./TaskRow";
 import { CatFolderIcon } from "./icons";
 import {
   IconBell,
+  IconBook,
+  IconChat,
   IconClose,
+  IconClock,
+  IconHome,
   IconPencil,
   IconPlus,
   IconSearch,
@@ -1222,7 +1226,7 @@ export function GenieApp() {
           </div>
         </header>
 
-        <div className="content-pattern flex min-w-0 flex-1 items-start gap-5 px-4 py-5 sm:px-6">
+        <div className="content-pattern flex min-w-0 flex-1 items-start gap-5 px-4 py-5 pb-24 sm:px-6 lg:pb-5">
           <main className="flex min-w-0 flex-1 flex-col space-y-5">
             <section className="order-0 surface soft-shadow relative overflow-hidden p-5 sm:p-6">
               <div className="flex items-start justify-between gap-4">
@@ -1706,6 +1710,50 @@ export function GenieApp() {
             </aside>
           )}
         </div>
+        <nav
+          aria-label="เมนูหลักบนมือถือ"
+          className="fixed inset-x-3 bottom-3 z-40 flex items-end justify-around rounded-3xl border border-line bg-paper/95 px-2 py-2 shadow-lg backdrop-blur lg:hidden"
+        >
+          {[
+            { key: "home" as NavKey, label: "หน้าหลัก", Icon: IconHome },
+            { key: "chat" as NavKey, label: "แชท", Icon: IconChat },
+          ].map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              onClick={() => handleNav(key)}
+              className={`focus-ring flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 text-[9px] font-semibold transition ${
+                activeNav === key ? "text-navy" : "text-muted"
+              }`}
+              aria-current={activeNav === key ? "page" : undefined}
+            >
+              <Icon size={17} />
+              {label}
+            </button>
+          ))}
+          <button
+            onClick={focusChat}
+            aria-label="เพิ่มการบ้าน"
+            className="focus-ring -mt-7 grid h-12 w-12 shrink-0 place-items-center rounded-full border-4 border-cream bg-navy text-paper shadow-md"
+          >
+            <IconPlus size={19} />
+          </button>
+          {[
+            { key: "tasks" as NavKey, label: "การบ้าน", Icon: IconBook },
+            { key: "reminder" as NavKey, label: "กำหนดส่ง", Icon: IconClock },
+          ].map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              onClick={() => handleNav(key)}
+              className={`focus-ring flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 text-[9px] font-semibold transition ${
+                activeNav === key ? "text-navy" : "text-muted"
+              }`}
+              aria-current={activeNav === key ? "page" : undefined}
+            >
+              <Icon size={17} />
+              {label}
+            </button>
+          ))}
+        </nav>
         <footer className="relative border-t border-line bg-paper/75 px-6 py-4 text-center text-[11px] text-muted">
           <span>มีคำแนะนำหรืออยากคุยกับเราไหม? </span>
           <button
