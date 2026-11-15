@@ -11,7 +11,7 @@ export type AiResult = {
   folders: string[];
 };
 
-export type AiMode = "economy" | "balanced";
+export type AiMode = "economy" | "balanced" | "smart";
 
 // ถามพี่จินนี่ (Gemini) ผ่าน API ในแอป ถ้าพลาดคืน null ให้ไปใช้กฎในเครื่องแทน
 export async function askGenie(
@@ -24,7 +24,7 @@ export async function askGenie(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text, folders, mode }),
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(28000),
     });
 
     if (!res.ok) return null;

@@ -39,6 +39,16 @@ import {
   type AccountUser,
 } from "@/lib/supabase";
 import { askGenie, type AiMode } from "@/lib/genie-ai";
+import {
+  anchorDate,
+  canonicalDue,
+  daysBetween,
+  describeDue,
+  isTaskUrgent,
+  parseDueAnswer,
+  resolveDue,
+  startOfDay,
+} from "@/lib/due-date";
 import { ChatPanel, type ChatMessage } from "./ChatPanel";
 import { AccountAvatar } from "./AccountAvatar";
 import { CalendarView } from "./CalendarView";
@@ -96,10 +106,10 @@ const subscribeAiMode = (callback: () => void) => {
   window.addEventListener("p-genie-ai-mode", callback);
   return () => window.removeEventListener("p-genie-ai-mode", callback);
 };
-const getAiMode = (): AiMode =>
-  window.localStorage.getItem(AI_MODE_KEY) === "balanced"
-    ? "balanced"
-    : "economy";
+const getAiMode = (): AiMode => {
+  const stored = window.localStorage.getItem(AI_MODE_KEY);
+  return stored === "balanced" || stored === "smart" ? stored : "economy";
+};
 const getOnboardingDismissed = () =>
   window.localStorage.getItem(ONBOARDING_KEY) === "1";
 
@@ -191,76 +201,30 @@ function buildWeek(today: Date) {
   });
 }
 
-function dueMatches(due: string, key: string) {
-  return due.includes(key);
+function taskDue(task: Task, today: Date = new Date()) {
+  return resolveDue(task.due, anchorDate(task.createdAt ?? today));
 }
 
-function dueSortRank(due: string): number {
-  if (due.includes("วันนี้")) return 0;
-  if (due.includes("พรุ่งนี้")) return 1;
-  if (due.includes("มะรืน")) return 2;
-  if (due.includes("สัปดาห์หน้า")) return 7;
+function isSameDay(a: Date | null, b: Date | null) {
+  return Boolean(a && b && daysBetween(a, b) === 0);
+}
 
-  const weekdays = [
-    "อาทิตย์",
-    "จันทร์",
-    "อังคาร",
-    "พุธ",
-    "พฤหัสบดี",
-    "ศุกร์",
-    "เสาร์",
-  ];
-  const day = weekdays.findIndex((name) => due.includes(`วัน${name}`));
-  if (day >= 0) {
-    const today = new Date().getDay();
-    let delta = (day - today + 7) % 7;
-    if (due.includes("หน้า")) delta += 7;
-    return delta || 0;
-  }
+function dueMatches(
+  due: string,
+  targetKey: string,
+  createdAt?: string | number | null,
+) {
+  const today = startOfDay(new Date());
+  const target = resolveDue(targetKey, today);
+  const date = resolveDue(due, anchorDate(createdAt ?? today));
+  if (target && date) return daysBetween(target, date) === 0;
+  return due.includes(targetKey);
+}
 
-  const monthNames = [
-    "ม.ค.",
-    "ก.พ.",
-    "มี.ค.",
-    "เม.ย.",
-    "พ.ค.",
-    "มิ.ย.",
-    "ก.ค.",
-    "ส.ค.",
-    "ก.ย.",
-    "ต.ค.",
-    "พ.ย.",
-    "ธ.ค.",
-  ];
-  const date = due.match(/(\d{1,2})\s*(ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.)/);
-  if (date) {
-    const month = monthNames.indexOf(date[2]);
-    const target = new Date(new Date().getFullYear(), month, Number(date[1]));
-    const today = new Date();
-    return Math.max(
-      0,
-      Math.ceil((target.getTime() - today.getTime()) / 86400000),
-    );
-  }
-
-  const numericDate = due.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
-  if (numericDate) {
-    const year = numericDate[3]
-      ? Number(numericDate[3]) < 100
-        ? 2000 + Number(numericDate[3])
-        : Number(numericDate[3])
-      : new Date().getFullYear();
-    const target = new Date(year, Number(numericDate[2]) - 1, Number(numericDate[1]));
-    const today = new Date();
-    return Math.max(
-      0,
-      Math.ceil((target.getTime() - today.getTime()) / 86400000),
-    );
-  }
-
-  const numberOfDays = due.match(/อีก\s*(\d+)\s*วัน/);
-  if (numberOfDays) return Number(numberOfDays[1]);
-  return 100000;
+function dueSortRank(due: string, createdAt?: string | number | null) {
+  const date = resolveDue(due, anchorDate(createdAt));
+  if (!date) return 100000;
+  return daysBetween(new Date(), date);
 }
 
 export function GenieApp() {
@@ -477,7 +441,7 @@ export function GenieApp() {
         const folder = folderForSubject(t.subject, folders);
         if (folder?.id !== filter.id) return false;
       }
-      if (filter?.kind === "due" && !dueMatches(t.due, filter.key)) return false;
+      if (filter?.kind === "due" && !dueMatches(t.due, filter.key, t.createdAt)) return false;
       if (!q) return true;
       return `${t.title} ${subjectLabel(t.subject)} ${t.due}`
         .toLowerCase()
@@ -485,7 +449,8 @@ export function GenieApp() {
       })
       .sort((a, b) => {
         if (a.done !== b.done) return a.done ? 1 : -1;
-        const dueOrder = dueSortRank(a.due) - dueSortRank(b.due);
+        const dueOrder =
+          dueSortRank(a.due, a.createdAt) - dueSortRank(b.due, b.createdAt);
         if (dueOrder !== 0) return dueOrder;
         const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -500,17 +465,15 @@ export function GenieApp() {
   );
 
   const tomorrowTasks = useMemo(
-    () => tasks.filter((t) => !t.done && dueMatches(t.due, "พรุ่งนี้")),
+    () =>
+      tasks.filter(
+        (t) => !t.done && dueMatches(t.due, "พรุ่งนี้", t.createdAt),
+      ),
     [tasks],
   );
 
   const urgentTasks = useMemo(
-    () =>
-      tasks.filter(
-        (t) =>
-          !t.done &&
-          (dueMatches(t.due, "วันนี้") || dueMatches(t.due, "พรุ่งนี้")),
-      ),
+    () => tasks.filter((t) => !t.done && isTaskUrgent(t)),
     [tasks],
   );
 
@@ -798,31 +761,33 @@ export function GenieApp() {
         return;
       }
 
-      const dueAnswer = parseTasks(text).find(
-        (task) => task.due !== "ยังไม่ระบุวันส่ง",
-      );
+      const dueAnswer = parseDueAnswer(text);
       if (dueAnswer) {
+        const label = dueAnswer.label;
+        const diff = dueAnswer.date ? daysBetween(new Date(), dueAnswer.date) : null;
+        const urgent = diff !== null && diff >= 0 && diff <= 2;
+
         setTasks((prev) =>
           prev.map((task) =>
             pendingDueTaskIds.includes(task.id)
-              ? {
-                  ...task,
-                  due: dueAnswer.due,
-                  urgent: dueAnswer.urgent,
-                }
+              ? { ...task, due: label, urgent }
               : task,
           ),
         );
         for (const id of pendingDueTaskIds) {
-          void updateTaskDue(id, dueAnswer.due, dueAnswer.urgent);
+          void updateTaskDue(id, label, urgent);
         }
         setPendingDueTaskIds([]);
+        const hint = dueAnswer.date ? ` (${describeDue(dueAnswer.date)})` : "";
         setMessages((prev) => [
           ...prev,
           {
             id: uid(),
             role: "genie",
-            text: `โอเคจ้า อัปเดตให้แล้ว ส่ง${dueAnswer.due}นะ`,
+            text:
+              dueAnswer.kind === "unknown"
+                ? "โอเคจ้า เก็บไว้ก่อนนะ ไว้รู้วันส่งแล้วบอกพี่จินนี่ได้เลย"
+                : `โอเคจ้า อัปเดตให้แล้ว ส่ง${label}นะ${hint}`,
           },
         ]);
         return;
@@ -860,11 +825,9 @@ export function GenieApp() {
 
     // คำถามค้นงานวันนี้ต้องอ่านจากงานจริง ห้ามส่งเข้า AI ให้สร้างงานหรือโฟลเดอร์
     if (isTodayQuestion(text)) {
-      const todayDay = `วัน${FULL_DAYS[new Date().getDay()]}`;
+      const today = startOfDay(new Date());
       const dueToday = tasks.filter(
-        (task) =>
-          !task.done &&
-          (dueMatches(task.due, "วันนี้") || dueMatches(task.due, todayDay)),
+        (task) => !task.done && isSameDay(taskDue(task), today),
       );
       const answer =
         dueToday.length > 0
@@ -967,15 +930,20 @@ export function GenieApp() {
       return;
     }
 
-    const newTasks: Task[] = normalized.map((p) => ({
-      id: uid(),
-      title: p.title,
-      subject: p.subject,
-      due: p.due,
-      createdAt: Date.now(),
-      urgent: p.urgent,
-      done: false,
-    }));
+    const now = new Date();
+    const newTasks: Task[] = normalized.map((p) => {
+      // เก็บเป็นวันที่จริง เช่น 16 พ.ย. ไม่เก็บคำว่า "พรุ่งนี้" เพราะจะเลื่อนทุกวัน
+      const due = p.due === "ยังไม่ระบุวันส่ง" ? p.due : canonicalDue(p.due, now) ?? p.due;
+      return {
+        id: uid(),
+        title: p.title,
+        subject: p.subject,
+        due,
+        createdAt: Date.now(),
+        urgent: p.urgent,
+        done: false,
+      };
+    });
 
     setTasks((prev) => [...newTasks, ...prev]);
     void addTasks(newTasks);
@@ -985,8 +953,8 @@ export function GenieApp() {
     );
     setPendingDueTaskIds(missingDue.map((task) => task.id));
 
-    const list = normalized
-      .map((p) => `• ${subjectLabel(p.subject)}: ${p.title} (${p.due})`)
+    const list = newTasks
+      .map((task) => `• ${subjectLabel(task.subject)}: ${task.title} (${task.due})`)
       .join("\n");
 
     const folderLine =
@@ -1658,7 +1626,8 @@ export function GenieApp() {
                   {week.map((d) => {
                     const dots = Math.min(
                       tasks.filter(
-                        (t) => !t.done && dueMatches(t.due, d.dueKey),
+                        (t) =>
+                          !t.done && dueMatches(t.due, d.dueKey, t.createdAt),
                       ).length,
                       3,
                     );

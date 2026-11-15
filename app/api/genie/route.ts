@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { formatDueDate, resolveDue, daysBetween } from "@/lib/due-date";
 
 type GenieTask = {
   title: string;
@@ -19,6 +20,31 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// เวลาที่ไทยอาจต่างจากเซิร์ฟเวอร์ ต้องยึดวันที่ไทยเป็นหลัก
+function bangkokToday() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const get = (type: string) =>
+    Number(parts.find((part) => part.type === type)?.value ?? 0);
+  return new Date(get("year"), get("month") - 1, get("day"));
+}
+
+function thaiDateLine(today: Date) {
+  const weekday = new Intl.DateTimeFormat("th-TH", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Asia/Bangkok",
+  }).format(today);
+  const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  return `Today is ${weekday} (${iso} Gregorian, ${today.getFullYear() + 543} BE).`;
+}
+
 const SYSTEM_PROMPT = `You are "พี่จินนี่" (P' Genie), a friendly Thai study buddy inside a homework to-do app.
 Your job: read what the student typed (usually Thai, sometimes messy or with typos) and turn it into homework items.
 
@@ -32,7 +58,11 @@ Rules:
 - Understand Thai school slang: ฟิ or ฟิสิกส์ = ฟิสิกส์, เลข or คณิต = คณิต, ชีวะ or ชีวะวิทยา = ชีววิทยา, อิ๊ง or อังกฤษ = อังกฤษ, วิทย์ = วิทยาศาสตร์, สังคมศึกษา = สังคม, ไทย = ไทย, เคมี = เคมี.
 - Correct common typos and speech-to-text mistakes: ฟิสิก, ฟิสิกส์, ฟิ = ฟิสิกส์; คณิด, คณิต = คณิต; วิท, วิทย์ = วิทยาศาสตร์; ชีวะ = ชีววิทยา; การบ้านน = การบ้าน. Keep the intended meaning instead of copying the typo into the task.
 - Understand topic clues: เซล or เซลล์ means ชีววิทยา, even when the student says วิทย์. For example, งานวิทย์เรื่องเซลล์ must go to ชีววิทยา.
+- The current date in Thailand is included with every message. Always use it to work out relative dates.
+- Check weekday names against the real calendar. If today is Sunday 15 November 2026, then วันพรุ่งนี้ is Monday 16 November 2026 and วันศุกร์ is Friday 20 November 2026.
 - due: copy the deadline wording from the message (วันนี้, พรุ่งนี้, มะรืนนี้, วันศุกร์, สัปดาห์หน้า, 12 ม.ค., 30/11 ...). If there is no deadline, use "ยังไม่ระบุวันส่ง".
+- When the student gives a specific date, make sure day and month are not swapped. 30/11 means 30 November, never 3 November. If the year is missing and that month already passed this year, assume next year.
+- The student may type with typos, no spaces, or speech-to-text errors. Read the closest intended word instead of copying the mistake.
 - urgent: true only when due is วันนี้, พรุ่งนี้ or มะรืนนี้.
 - Words about weather, body, mood, or feelings such as ร้อน, หนาว, หิว, งง, เบื่อ, เหนื่อย, เครียด, ปวดหัว are conversation unless the student clearly connects them to homework.
 - folders: list of folder names that should exist in the app. Always include the subject of every task you return. If the student asks to organise or separate their homework into folders, add those folder names too. If the student mentions a folder that is not in their current list, add it. Use the same full Thai subject names. Never repeat a name that is already in the student's folder list.
@@ -122,7 +152,12 @@ export async function POST(request: Request) {
   if (!text) {
     return NextResponse.json({ error: "ยังไม่มีข้อความ" }, { status: 400 });
   }
-  const mode = body.mode === "balanced" ? "balanced" : "economy";
+  const mode =
+    body.mode === "balanced"
+      ? "balanced"
+      : body.mode === "smart"
+        ? "smart"
+        : "economy";
 
   const folders = Array.isArray(body.folders)
     ? body.folders
@@ -135,17 +170,24 @@ export async function POST(request: Request) {
       ? `The student already made these folders: ${folders.join(", ")}. Use one of them when it fits.`
       : "The student has no folders yet, so use plain subject names.";
 
+  const today = bangkokToday();
+  const dateLine = thaiDateLine(today);
+
   const payload = {
     systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
     contents: [
       {
         role: "user",
-        parts: [{ text: `${folderLine}\n\nข้อความจากนักเรียน: ${text}` }],
+        parts: [
+          {
+            text: `${dateLine}\n${folderLine}\n\nข้อความจากนักเรียน: ${text}`,
+          },
+        ],
       },
     ],
     generationConfig: {
-      temperature: 0.3,
-      maxOutputTokens: 300,
+      temperature: 0.2,
+      maxOutputTokens: 500,
       responseMimeType: "application/json",
       responseSchema: RESPONSE_SCHEMA,
     },
@@ -153,17 +195,21 @@ export async function POST(request: Request) {
 
   let lastError = "ต่อ Gemini ไม่ได้";
   const startedAt = Date.now();
-  const BUDGET_MS = 15000;
+  const BUDGET_MS = mode === "smart" ? 26000 : 16000;
+  const attemptTimeout = mode === "smart" ? 12000 : ATTEMPT_TIMEOUT_MS;
   const quickRequest =
     text.length <= 90 &&
     !/(และ|กับ|หลาย|แยก|โฟลเดอร์|ช่วยจัด|ช่วยคิด|อะไรบ้าง|ไหนบ้าง)/.test(text);
-  // งานสั้นใช้ Lite ให้ไว งานหลายเงื่อนไขใช้รุ่นเต็มให้เข้าใจแม่นกว่า
+  // ประหยัด = Lite ก่อนถ้างานง่าย, งานยากข้ามไป Flash
+  // สมดุล = Flash ก่อน, ฉลาดสุด = Pro ก่อนแล้วถอยลงมา
   const models =
-    mode === "balanced"
-      ? ["gemini-flash-latest", "gemini-3.1-flash-lite", "gemini-flash-lite-latest"]
-      : quickRequest
-        ? ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.1-flash-lite"]
-        : ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+    mode === "smart"
+      ? ["gemini-pro-latest", "gemini-flash-latest", "gemini-3.1-flash-lite"]
+      : mode === "balanced"
+        ? ["gemini-flash-latest", "gemini-3.1-flash-lite", "gemini-flash-lite-latest"]
+        : quickRequest
+          ? ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.1-flash-lite"]
+          : ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-3.1-flash-lite"];
 
   // ลองรุ่นที่เบากว่า + ลองซ้ำอีกรอบ เผื่อ Google ตอบ 503 เพราะคนใช้เยอะ
   for (let round = 0; round < 2; round += 1) {
@@ -185,7 +231,7 @@ export async function POST(request: Request) {
               "x-goog-api-key": key,
             },
             body: JSON.stringify(payload),
-            signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+            signal: AbortSignal.timeout(attemptTimeout),
           },
         );
 
@@ -211,6 +257,28 @@ export async function POST(request: Request) {
         const tasks = Array.isArray(parsed.tasks)
           ? parsed.tasks.map(cleanTask).filter((t): t is GenieTask => t !== null)
           : [];
+
+        // ข้อความเดียวและมีวันที่ชัดเจน ให้ใช้ตัวแปลงวันที่ในเครื่องยืนยันอีกชั้น
+        // กันโมเดลสลับวันกับเดือน หรืออ่านวันที่พลาด
+        const mentionsDue =
+          /(ส่ง|กำหนด|ภายใน|ก่อน|เดดไลน์|deadline|วันนี้|พรุ่งนี้|มะรืน|สัปดาห์หน้า|อาทิตย์หน้า|เดือนหน้า)/.test(
+            text,
+          ) || /^\s*\d{1,2}\s*\/\s*\d{1,2}/.test(text);
+        if (tasks.length === 1 && mentionsDue) {
+          const date = resolveDue(text, today);
+          if (date) {
+            const diff = daysBetween(today, date);
+            tasks[0].due = formatDueDate(date, today);
+            tasks[0].urgent = diff >= 0 && diff <= 2;
+          } else if (tasks[0].due !== "ยังไม่ระบุวันส่ง") {
+            const modelDate = resolveDue(tasks[0].due, today);
+            if (modelDate) {
+              tasks[0].due = formatDueDate(modelDate, today);
+              const diff = daysBetween(today, modelDate);
+              tasks[0].urgent = diff >= 0 && diff <= 2;
+            }
+          }
+        }
         const reply =
           typeof parsed.reply === "string" && parsed.reply.trim()
             ? parsed.reply.trim().slice(0, 400)
