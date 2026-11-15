@@ -1670,7 +1670,7 @@ export function GenieApp() {
                 </div>
 
                 <div className="mt-2.5 grid grid-cols-4 gap-1 sm:mt-4 sm:grid-cols-7 sm:gap-2">
-                  {week.map((d) => {
+                  {week.map((d, weekIndex) => {
                     const dots = Math.min(
                       tasks.filter(
                         (t) =>
@@ -1693,7 +1693,7 @@ export function GenieApp() {
                           active
                             ? "bg-navy text-paper"
                             : "bg-cream text-ink hover:bg-cream-deep"
-                        }`}
+                        } ${weekIndex === 4 ? "col-start-2 sm:col-auto" : ""}`}
                       >
                         <span className="block truncate text-[8px] opacity-70 sm:text-[10px]">
                           {d.label}
