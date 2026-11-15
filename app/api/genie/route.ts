@@ -45,6 +45,60 @@ function thaiDateLine(today: Date) {
   return `Today is ${weekday} (${iso} Gregorian, ${today.getFullYear() + 543} BE).`;
 }
 
+// โหมดฉลาดสุด: ถาม Google ครั้งเดียวว่ามีรุ่น Pro ให้ใช้ไหม แล้วจำไว้ 1 ชั่วโมง
+let strongCache: { models: string[]; at: number } | null = null;
+
+async function strongModels(key: string): Promise<string[]> {
+  if (strongCache && Date.now() - strongCache.at < 60 * 60 * 1000) {
+    return strongCache.models;
+  }
+
+  const fallback = ["gemini-flash-latest", "gemini-3.1-flash-lite"];
+
+  try {
+    const res = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",
+      {
+        headers: { "x-goog-api-key": key },
+        signal: AbortSignal.timeout(4000),
+      },
+    );
+
+    if (res.ok) {
+      const json = (await res.json()) as {
+        models?: { name?: string; supportedGenerationMethods?: string[] }[];
+      };
+      const names = (json.models ?? [])
+        .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+        .map((m) => (m.name ?? "").replace(/^models\//, ""))
+        .filter(
+          (name) =>
+            name &&
+            !/tts|image|embedding|vision|thinking|learnlm/i.test(name),
+        );
+
+      const pro = names.find((name) => /pro/i.test(name));
+      const flash =
+        names.find((name) => name === "gemini-flash-latest") ??
+        names.find((name) => /flash/i.test(name) && !/lite/i.test(name));
+
+      const list = [pro, flash, "gemini-3.1-flash-lite"].filter(
+        (name): name is string => Boolean(name),
+      );
+
+      if (list.length > 0) {
+        strongCache = { models: [...new Set(list)], at: Date.now() };
+        return strongCache.models;
+      }
+    }
+  } catch {
+    // ใช้ลิสต์สำรอง
+  }
+
+  strongCache = { models: fallback, at: Date.now() };
+  return fallback;
+}
+
 const SYSTEM_PROMPT = `You are "พี่จินนี่" (P' Genie), a friendly Thai study buddy inside a homework to-do app.
 Your job: read what the student typed (usually Thai, sometimes messy or with typos) and turn it into homework items.
 
@@ -204,7 +258,7 @@ export async function POST(request: Request) {
   // สมดุล = Flash ก่อน, ฉลาดสุด = Pro ก่อนแล้วถอยลงมา
   const models =
     mode === "smart"
-      ? ["gemini-pro-latest", "gemini-flash-latest", "gemini-3.1-flash-lite"]
+      ? await strongModels(key)
       : mode === "balanced"
         ? ["gemini-flash-latest", "gemini-3.1-flash-lite", "gemini-flash-lite-latest"]
         : quickRequest
@@ -261,7 +315,7 @@ export async function POST(request: Request) {
         // ข้อความเดียวและมีวันที่ชัดเจน ให้ใช้ตัวแปลงวันที่ในเครื่องยืนยันอีกชั้น
         // กันโมเดลสลับวันกับเดือน หรืออ่านวันที่พลาด
         const mentionsDue =
-          /(ส่ง|กำหนด|ภายใน|ก่อน|เดดไลน์|deadline|วันนี้|พรุ่งนี้|มะรืน|สัปดาห์หน้า|อาทิตย์หน้า|เดือนหน้า)/.test(
+          /(ส่ง|กำหนด|ภายใน|ก่อน|เดดไลน์|deadline|วันที่|สอบ|อีก\s*\d+\s*(วัน|สัปดาห์|เดือน)|วันนี้|พรุ่งนี้|มะรืน|สัปดาห์หน้า|อาทิตย์หน้า|เดือนหน้า)/.test(
             text,
           ) || /^\s*\d{1,2}\s*\/\s*\d{1,2}/.test(text);
         if (tasks.length === 1 && mentionsDue) {
