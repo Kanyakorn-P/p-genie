@@ -189,6 +189,32 @@ function cleanTask(raw: unknown): GenieTask | null {
   };
 }
 
+// ชั่วคราวสำหรับตรวจว่าคีย์นี้ใช้รุ่นไหนได้บ้าง
+export async function GET() {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return NextResponse.json({ error: "no key" }, { status: 503 });
+  try {
+    const res = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",
+      { headers: { "x-goog-api-key": key }, signal: AbortSignal.timeout(8000) },
+    );
+    const json = (await res.json()) as {
+      models?: { name?: string; supportedGenerationMethods?: string[] }[];
+    };
+    const names = (json.models ?? [])
+      .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+      .map((m) => (m.name ?? "").replace(/^models\//, ""))
+      .filter((n) => /gemini/i.test(n))
+      .sort();
+    return NextResponse.json({ count: names.length, names });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "failed" },
+      { status: 502 },
+    );
+  }
+}
+
 export async function POST(request: Request) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
