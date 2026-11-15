@@ -83,12 +83,12 @@ const START_MESSAGE: ChatMessage = {
 const ONBOARDING_KEY = "p-genie-onboarding-dismissed-v1";
 const ONBOARDING_STEPS = [
   {
-    title: "พิมพ์การบ้านแบบที่พูดจริงได้เลย",
-    text: "เช่น “ฟิสิกส์หน้า 45 ส่งพรุ่งนี้” พี่จินนี่จะแยกวิชา รายละเอียด และวันส่งให้",
+    title: "พิมพ์งานที่อยากจดได้เลย",
+    text: "การบ้านบอกวิชากับรายละเอียด ส่วนธุระหรือนัดหมายบอกสิ่งที่ต้องทำและวันเวลาได้เลย",
   },
   {
-    title: "ไม่ระบุวันส่งก็ได้",
-    text: "พี่จินนี่จะถามต่อว่า “งานนี้ส่งวันไหนเหรอ?” แล้วเอาคำตอบไปเติมงานเดิมให้",
+    title: "ยังไม่รู้กำหนดก็จดไว้ก่อนได้",
+    text: "การบ้านที่ยังไม่ระบุกำหนด พี่จินนี่จะถามวันส่ง ส่วนงานทั่วไปจะไม่ถามวันต่อ",
   },
   {
     title: "โฟลเดอร์สร้างและจัดให้เอง",
@@ -689,7 +689,7 @@ export function GenieApp() {
   function casualReply(text: string): string | null {
     const value = text.trim();
     const hasHomeworkIntent =
-      /(การบ้าน|งาน|ส่ง|ทำ|สอบ|โจทย์|หน้า|บทที่|แบบฝึกหัด|อาจารย์|ครู|วิชา|โฟลเดอร์)/.test(
+      /(การบ้าน|งาน|ส่ง|ทำ|สอบ|โจทย์|หน้า|บทที่|แบบฝึกหัด|อาจารย์|ครู|วิชา|โฟลเดอร์|ช่วยจำ|เตือน|อย่าลืม|นัด|จ่าย|ซื้อ|โทร|ไปรับ|ซัก|ล้าง|จอง|ประชุม)/.test(
         value,
       );
     if (hasHomeworkIntent) return null;
@@ -781,7 +781,7 @@ export function GenieApp() {
             text: `หมายถึงงานนี้จ้า\n${pendingTasks
               .map(
                 (task) =>
-                  `• ${subjectLabel(task.subject)}: ${task.title}\nงานนี้ส่งวันไหนเหรอ?`,
+                  `• ${subjectLabel(task.subject)}: ${task.title}\nงานนี้มีกำหนดวันไหนเหรอ?`,
               )
               .join("\n")}`,
           },
@@ -814,7 +814,7 @@ export function GenieApp() {
             role: "genie",
             text:
               dueAnswer.kind === "unknown"
-                ? "โอเคจ้า เก็บไว้ก่อนนะ ไว้รู้วันส่งแล้วบอกพี่จินนี่ได้เลย"
+                ? "โอเคจ้า เก็บไว้ก่อนนะ ไว้รู้กำหนดแล้วบอกพี่จินนี่ได้เลย"
                 : `โอเคจ้า อัปเดตให้แล้ว กำหนดส่ง ${label} นะ${hint}`,
           },
         ]);
@@ -857,13 +857,13 @@ export function GenieApp() {
       );
       const answer =
         dueToday.length > 0
-          ? `วันนี้มี ${dueToday.length} งานที่ต้องส่งน้า\n${dueToday
+          ? `วันนี้มี ${dueToday.length} งานที่มีกำหนดน้า\n${dueToday
               .map(
                 (task) =>
                   `• ${subjectLabel(task.subject)}: ${task.title} (${task.due})`,
               )
               .join("\n")}`
-          : "วันนี้ยังไม่มีการบ้านที่ต้องส่งน้า พักหายใจได้เลย ✨";
+          : "วันนี้ยังไม่มีงานที่มีกำหนดไว้น้า พักหายใจได้เลย ✨";
 
       setMessages((prev) => [
         ...prev,
@@ -878,7 +878,7 @@ export function GenieApp() {
         {
           id: uid(),
           role: "genie",
-          text: "ได้เลยจ้า มีงานอะไรเพิ่มบ้าง? บอกพี่จินนี่ได้เลยว่าเป็นวิชาอะไร ทำอะไร และส่งวันไหน เช่น “คณิตทำแบบฝึกหัดหน้า 20 ส่งพรุ่งนี้”",
+          text: "ได้เลยจ้า อยากจดการบ้านหรืองานอะไรบอกพี่จินนี่ได้เลยน้า ถ้าเป็นการบ้านบอกวิชากับงานที่ต้องทำ ถ้ามีกำหนดวันไหนก็บอกได้เลย",
         },
       ]);
       return;
@@ -975,7 +975,7 @@ export function GenieApp() {
             (ai?.reply ||
               (created.length > 0
                 ? "แยกโฟลเดอร์ให้เรียบร้อยแล้วน้า"
-                : "ยังไม่เห็นการบ้านเลย ลองพิมพ์อีกทีนะ เช่น ฟิสิกส์หน้า 45 ส่งพรุ่งนี้")) +
+                : "ยังไม่เห็นงานที่อยากจด ลองเล่ารายละเอียดเพิ่มอีกนิดน้า")) +
             folderLine,
         },
       ]);
@@ -985,7 +985,7 @@ export function GenieApp() {
     const now = new Date();
     const newTasks: Task[] = fresh.map((p) => {
       // เก็บเป็นวันที่จริง เช่น 16 พ.ย. ไม่เก็บคำว่า "พรุ่งนี้" เพราะจะเลื่อนทุกวัน
-      const due = p.due === "ยังไม่ระบุวันส่ง" ? p.due : canonicalDue(p.due, now) ?? p.due;
+      const due = p.due.includes("ไม่ระบุ") ? "ยังไม่ระบุกำหนด" : canonicalDue(p.due, now) ?? p.due;
       return {
         id: uid(),
         title: p.title,
@@ -1001,7 +1001,7 @@ export function GenieApp() {
     void addTasks(newTasks);
 
     const missingDue = newTasks.filter(
-      (task) => task.due === "ยังไม่ระบุวันส่ง",
+      (task) => task.subject !== "งานทั่วไป" && task.due.includes("ไม่ระบุ"),
     );
     setPendingDueTaskIds(missingDue.map((task) => task.id));
 
@@ -1015,7 +1015,7 @@ export function GenieApp() {
         : "";
     const dueQuestion =
       missingDue.length > 0
-        ? `\nงาน${missingDue.length > 1 ? "พวกนี้" : "นี้"}ส่งวันไหนเหรอ?`
+        ? `\nงาน${missingDue.length > 1 ? "พวกนี้" : "นี้"}มีกำหนดวันไหนเหรอ?`
         : "";
 
     setMessages((prev) => [
@@ -1892,7 +1892,7 @@ export function GenieApp() {
                     rel="noreferrer"
                     className="flex items-center justify-between rounded-xl bg-cream px-3 py-2 text-[11px] font-semibold text-navy transition hover:bg-green-soft"
                   >
-                    <span>LINE: nongpang2009</span>
+                    <span>Line</span>
                     <span className="text-muted">เปิดแชท ↗</span>
                   </a>
                 </div>

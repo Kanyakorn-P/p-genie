@@ -151,7 +151,12 @@ export function resolveDue(
 
   if (/มะรืน/.test(text)) return addDays(base, 2);
   if (/พรุ่งนี้/.test(text)) return addDays(base, 1);
-  if (/(^|[^\d])วันนี้/.test(text) || /^today$/i.test(text)) return base;
+  if (
+    /(^|[^\d])วันนี้|เช้านี้|บ่ายนี้|เย็นนี้|คืนนี้/.test(text) ||
+    /^today$/i.test(text)
+  ) {
+    return base;
+  }
 
   const inDays = text.match(/อีก\s*(\d+)\s*วัน/);
   if (inDays) return addDays(base, Number(inDays[1]));
@@ -268,7 +273,7 @@ export function taskDueLabel(
   today: Date = new Date(),
 ) {
   const date = taskDueDate(task, today);
-  if (!date) return task.due;
+  if (!date) return task.due.includes("ไม่ระบุ") ? "ยังไม่กำหนด" : task.due;
   const hint = describeDue(date, today);
   const shortHint =
     hint === "วันนี้" || hint === "พรุ่งนี้" || hint === "มะรืนนี้"
@@ -300,7 +305,7 @@ export function parseDueAnswer(text: string, today: Date = new Date()) {
   if (!clean) return null;
 
   if (/ไม่รู้|ยังไม่รู้|ไม่มี|ไม่แน่ใจ|ยังไม่กำหนด|แล้วแต่/.test(clean)) {
-    return { kind: "unknown" as const, date: null, label: "ยังไม่ระบุวันส่ง" };
+    return { kind: "unknown" as const, date: null, label: "ยังไม่ระบุกำหนด" };
   }
 
   const direct = resolveDue(clean, today);

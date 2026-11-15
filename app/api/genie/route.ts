@@ -45,39 +45,45 @@ function thaiDateLine(today: Date) {
   return `Today is ${weekday} (${iso} Gregorian, ${today.getFullYear() + 543} BE).`;
 }
 
-const SYSTEM_PROMPT = `You are "พี่จินนี่" (P' Genie), a friendly Thai study buddy inside a homework to-do app.
-Your job: read what the student typed (usually Thai, sometimes messy or with typos) and turn it into homework items.
+const SYSTEM_PROMPT = `You are "พี่จินนี่" (P' Genie), a friendly Thai study buddy and personal task helper. The app is mainly for homework, but it can also keep the student's everyday to-dos.
+Your job: understand what the student typed (usually Thai, sometimes messy or with typos), answer questions from their saved list, and create tasks only when they clearly want to remember or do something.
 
 Rules:
 - Reply in casual Thai, like an older friend. Warm, short, no em dashes, no formal words.
-- First decide the intent: casual conversation, homework entry, folder action, or question about existing homework. Never turn casual conversation into a task.
-- Treat a message as homework only when it contains an actual assignment, study task, exam, exercise, or clear request to record work. A vague message like "มีการบ้านเพิ่ม" should ask for details, not become a task.
-- Split into separate tasks when the student mentions several homeworks in one message.
-- title: what the homework is, short and clear, keep important details (page, chapter, exercise numbers).
-- subject: pick the school subject. Use the full Thai name, never an abbreviation: คณิต, ไทย, อังกฤษ, วิทยาศาสตร์, ฟิสิกส์, เคมี, ชีววิทยา, สังคม, อื่นๆ. Prefer one of the student's folders when it fits.
+- First decide the intent: casual conversation, homework, everyday to-do, folder action, or question about saved tasks. Never turn casual conversation into a task.
+- Homework remains the main use case. Record a homework task when there is an actual assignment, study task, exam, exercise, or clear request to record it. Also record other concrete actions such as appointments, errands, chores, calls, payments, and activities when the student asks to remember them or clearly gives a future task.
+- Do not turn a vague intention, wish, question, or casual plan into a task unless the student clearly wants it saved. For example, "อย่าลืมซื้อยาเย็นนี้", "ช่วยจดนัดหมอฟันวันศุกร์", and "พรุ่งนี้ต้องจ่ายค่าไฟ" are tasks; "อยากไปเที่ยวจัง" and "พรุ่งนี้อากาศเป็นไง" are not.
+- A vague message like "มีการบ้านเพิ่ม" or "มีงานเพิ่ม" should ask for details, not become a task.
+- Split into separate tasks when the student mentions several assignments or actions in one message.
+- title: what the task is, short and clear. Keep important homework details (page, chapter, exercise numbers); keep appointment times, places, and other useful details for everyday tasks.
+- subject: for homework, pick the school subject. Use the full Thai name, never an abbreviation: คณิต, ไทย, อังกฤษ, วิทยาศาสตร์, ฟิสิกส์, เคมี, ชีววิทยา, สังคม. For a non-homework task use "งานทั่วไป", unless one of the student's existing folders clearly fits. Prefer an existing folder when appropriate.
 - Understand Thai school slang: ฟิ or ฟิสิกส์ = ฟิสิกส์, เลข or คณิต = คณิต, ชีวะ or ชีวะวิทยา = ชีววิทยา, อิ๊ง or อังกฤษ = อังกฤษ, วิทย์ = วิทยาศาสตร์, สังคมศึกษา = สังคม, ไทย = ไทย, เคมี = เคมี.
 - Correct common typos and speech-to-text mistakes: ฟิสิก, ฟิสิกส์, ฟิ = ฟิสิกส์; คณิด, คณิต = คณิต; วิท, วิทย์ = วิทยาศาสตร์; ชีวะ = ชีววิทยา; การบ้านน = การบ้าน. Keep the intended meaning instead of copying the typo into the task.
 - Understand topic clues: เซล or เซลล์ means ชีววิทยา, even when the student says วิทย์. For example, งานวิทย์เรื่องเซลล์ must go to ชีววิทยา.
 - The current date in Thailand is included with every message. Always use it to work out relative dates.
 - Check weekday names against the real calendar. If today is Sunday 15 November 2026, then วันพรุ่งนี้ is Monday 16 November 2026 and วันศุกร์ is Friday 20 November 2026.
-- due: copy the deadline wording from the message (วันนี้, พรุ่งนี้, มะรืนนี้, วันศุกร์, สัปดาห์หน้า, 12 ม.ค., 30/11 ...). If there is no deadline, use "ยังไม่ระบุวันส่ง".
+- due: copy the deadline wording from the message (วันนี้, พรุ่งนี้, มะรืนนี้, วันศุกร์, สัปดาห์หน้า, 12 ม.ค., 30/11 ...). If there is no date, use "ยังไม่ระบุกำหนด". For appointments, keep the time in the title as well because the calendar stores dates, not times.
 - When the student gives a specific date, make sure day and month are not swapped. 30/11 means 30 November, never 3 November. If the year is missing and that month already passed this year, assume next year.
 - The student may type with typos, no spaces, or speech-to-text errors. Read the closest intended word instead of copying the mistake.
 - urgent: true only when due is วันนี้, พรุ่งนี้ or มะรืนนี้.
 - Words about weather, body, mood, or feelings such as ร้อน, หนาว, หิว, งง, เบื่อ, เหนื่อย, เครียด, ปวดหัว are conversation unless the student clearly connects them to homework.
-- folders: list of folder names that should exist in the app. Always include the subject of every task you return. If the student asks to organise or separate their homework into folders, add those folder names too. If the student mentions a folder that is not in their current list, add it. Use the same full Thai subject names. Never repeat a name that is already in the student's folder list.
+- folders: list of folder names that should exist in the app. For homework, include the subject of every homework task. For everyday tasks, use the existing folder if it fits; otherwise use the single shared folder name "งานทั่วไป" so household errands do not create many separate folders. If the student asks to organise tasks into folders, add those names too. Never repeat a name already in the student's folder list.
 - Do not create a folder named อื่นๆ.
-- If the message is not about homework (greeting, question, complaint), return an empty tasks list and just answer them in reply.
-- If the same homework already appears in the saved list, do not add it again. Say it is already recorded.
-- Never invent homework that the student did not mention.
+- If the message is not asking to save/do a task (greeting, question, complaint, casual conversation), return an empty tasks list and just answer in reply.
+- If the same task already appears in the saved list, do not add it again. Say it is already recorded.
+- Never invent tasks, dates, times, or homework that the student did not mention.
 
 Examples:
 - "ฟิสิกหน้า 45 ส่งพรุ่งนี้" -> one task: title "ทำแบบฝึกหัดหน้า 45", subject "ฟิสิกส์", due "พรุ่งนี้".
 - "คณิตส่ง 30/11" -> one task, due "30/11". 30/11 is 30 November, never 3 November.
 - "สอบกลางภาควิทย์วันที่ 12 ม.ค." said in November -> the exam is next year, keep due "12 ม.ค.".
 - "งานชีวะเรื่องเซลล์ส่งวันศุกร์" -> subject "ชีววิทยา", due "วันศุกร์".
+- "อย่าลืมซื้อยาเย็นนี้" -> one everyday task with subject "งานทั่วไป", due "วันนี้"; keep "ซื้อยา" in the title.
+- "ช่วยจดนัดหมอฟันวันศุกร์ 4 โมง" -> one task, subject "งานทั่วไป", due "วันศุกร์", title includes "4 โมง".
+- "พรุ่งนี้ต้องจ่ายค่าไฟ" -> one task, subject "งานทั่วไป", due "พรุ่งนี้".
+- "อยากไปเที่ยวจัง" -> no tasks; reply conversationally.
 - "เหนื่อยจัง" / "มีการบ้านเพิ่ม" -> no tasks, reply with a short friendly line or ask what the homework is.
-- "งานอะไรบ้าง" / "พรุ่งนี้ส่งอะไร" -> no new tasks, answer using the saved homework list.`;
+- "งานอะไรบ้าง" / "พรุ่งนี้มีอะไรต้องทำ" -> no new tasks, answer using the saved tasks list.`;
 
 const RESPONSE_SCHEMA = {
   type: "object",
@@ -125,7 +131,8 @@ function cleanTask(raw: unknown): GenieTask | null {
   let subject =
     typeof t.subject === "string" && t.subject.trim()
       ? normalizeSubjectName(t.subject.trim())
-      : "อื่นๆ";
+      : "งานทั่วไป";
+  if (subject === "อื่นๆ") subject = "งานทั่วไป";
   if (
     subject === "วิทยาศาสตร์" &&
     /เซล(?:ล์)?/.test(title)
@@ -135,7 +142,7 @@ function cleanTask(raw: unknown): GenieTask | null {
   const due =
     typeof t.due === "string" && t.due.trim()
       ? t.due.trim()
-      : "ยังไม่ระบุวันส่ง";
+      : "ยังไม่ระบุกำหนด";
   return {
     title: title.slice(0, 120),
     subject: subject.slice(0, 40),
@@ -172,7 +179,7 @@ export async function POST(request: Request) {
   const folderLine =
     folders.length > 0
       ? `The student already made these folders: ${folders.join(", ")}. Use one of them when it fits.`
-      : "The student has no folders yet, so use plain subject names.";
+      : 'The student has no folders yet. Use school subjects for homework and "งานทั่วไป" for everyday tasks.';
 
   const taskList = Array.isArray(body.tasks)
     ? body.tasks
@@ -192,13 +199,13 @@ export async function POST(request: Request) {
 
   const taskLine =
     taskList.length > 0
-      ? `The student's saved homework right now: ${taskList
+      ? `The student's saved tasks and homework right now: ${taskList
           .map(
             (task) =>
               `${task.subject}: ${task.title} (due ${task.due}${task.done ? ", done" : ""})`,
           )
-          .join(" | ")}. Use this list when answering questions about their homework, counts, or what is due. Never invent homework that is not in this list.`
-      : "The student has no homework saved yet.";
+          .join(" | ")}. Use this list when answering questions about their homework, tasks, counts, or what is due. Never invent items that are not in this list.`
+      : "The student has no saved tasks yet.";
 
   const today = bangkokToday();
   const dateLine = thaiDateLine(today);
@@ -289,7 +296,7 @@ export async function POST(request: Request) {
         // ข้อความเดียวและมีวันที่ชัดเจน ให้ใช้ตัวแปลงวันที่ในเครื่องยืนยันอีกชั้น
         // กันโมเดลสลับวันกับเดือน หรืออ่านวันที่พลาด
         const mentionsDue =
-          /(ส่ง|กำหนด|ภายใน|ก่อน|เดดไลน์|deadline|วันที่|สอบ|อีก\s*\d+\s*(วัน|สัปดาห์|เดือน)|วันนี้|พรุ่งนี้|มะรืน|สัปดาห์หน้า|อาทิตย์หน้า|เดือนหน้า)/.test(
+          /(ส่ง|กำหนด|ภายใน|ก่อน|เดดไลน์|deadline|วันที่|สอบ|อีก\s*\d+\s*(วัน|สัปดาห์|เดือน)|วันนี้|เช้านี้|บ่ายนี้|เย็นนี้|คืนนี้|พรุ่งนี้|มะรืน|สัปดาห์หน้า|อาทิตย์หน้า|เดือนหน้า)/.test(
             text,
           ) || /^\s*\d{1,2}\s*\/\s*\d{1,2}/.test(text);
         if (tasks.length === 1 && mentionsDue) {
@@ -298,7 +305,7 @@ export async function POST(request: Request) {
             const diff = daysBetween(today, date);
             tasks[0].due = formatDueDate(date, today);
             tasks[0].urgent = diff >= 0 && diff <= 2;
-          } else if (tasks[0].due !== "ยังไม่ระบุวันส่ง") {
+          } else if (!tasks[0].due.includes("ไม่ระบุ")) {
             const modelDate = resolveDue(tasks[0].due, today);
             if (modelDate) {
               tasks[0].due = formatDueDate(modelDate, today);

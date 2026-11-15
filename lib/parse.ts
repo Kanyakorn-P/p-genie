@@ -34,10 +34,17 @@ const WEEKDAYS: Record<string, string> = {
   อาทิตย์: "วันอาทิตย์",
 };
 
+const GENERAL_TASK_CUE =
+  /(ช่วยจด|ช่วยจำ|ช่วยเตือน|อย่าลืม|เตือน|นัด|ต้อง\s*(?:ซื้อ|จ่าย|โทร|ไป|ทำ|ส่ง|อ่าน|เตรียม|นัด|รับ|เอา|ซัก|ล้าง)|ซื้อ|จ่าย|โทร|ไปรับ|เอา.{0,8}ไป|ซัก|ล้าง|ทำความสะอาด|เตรียม|อ่านหนังสือ|ประชุม|พบหมอ|พบแพทย์|ส่งพัสดุ|จอง|ต่ออายุ|ส่งงาน)/;
+
 type DueResult = { label: string; raw: string };
 
 function detectDue(text: string): DueResult | null {
   const rules: { re: RegExp; label: (m: RegExpMatchArray) => string }[] = [
+    {
+      re: /(?:เช้า|บ่าย|เย็น)นี้|คืนนี้/,
+      label: () => "วันนี้",
+    },
     { re: /มะรืนนี้|มะรืน/, label: () => "มะรืนนี้" },
     { re: /พรุ่งนี้/, label: () => "พรุ่งนี้" },
     { re: /วันนี้/, label: () => "วันนี้" },
@@ -93,6 +100,10 @@ export function parseTasks(input: string): ParsedTask[] {
   const text = input.replace(/\r/g, " ").trim();
   if (text.length < 2) return [];
 
+  const hasSchoolSubject = [...text.matchAll(SUBJECT_REGEX)].length > 0;
+  const hasGeneralTaskCue = GENERAL_TASK_CUE.test(text);
+  if (!hasSchoolSubject && !hasGeneralTaskCue) return [];
+
   const chunks = text
     .split(/[,;\n|+]|และ/)
     .map((c) => c.trim())
@@ -105,7 +116,7 @@ export function parseTasks(input: string): ParsedTask[] {
     const segments: { subject: string; text: string }[] = [];
 
     if (matches.length === 0) {
-      segments.push({ subject: NO_SUBJECT, text: chunk });
+      segments.push({ subject: "งานทั่วไป", text: chunk });
     } else {
       matches.forEach((m, i) => {
         const start = m.index ?? 0;
@@ -124,7 +135,7 @@ export function parseTasks(input: string): ParsedTask[] {
       tasks.push({
         title: cleanTitle(segment.text, segment.subject, due),
         subject: segment.subject,
-        due: due?.label ?? "ยังไม่ระบุวันส่ง",
+        due: due?.label ?? "ยังไม่ระบุกำหนด",
         urgent: due ? ["วันนี้", "พรุ่งนี้", "มะรืนนี้"].includes(due.label) : false,
       });
     }
