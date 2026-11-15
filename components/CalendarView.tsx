@@ -29,6 +29,17 @@ const FULL_DAYS = [
   "เสาร์",
 ];
 const emptySubscribe = () => () => {};
+const MOBILE_QUERY = "(max-width: 639px)";
+
+function subscribeMobile(callback: () => void) {
+  const mediaQuery = window.matchMedia(MOBILE_QUERY);
+  mediaQuery.addEventListener("change", callback);
+  return () => mediaQuery.removeEventListener("change", callback);
+}
+
+function getIsMobile() {
+  return window.matchMedia(MOBILE_QUERY).matches;
+}
 
 function key(date: Date) {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
@@ -49,11 +60,13 @@ export function CalendarView({ tasks }: CalendarViewProps) {
     month: number;
   } | null>(null);
   const [selectedState, setSelectedState] = useState("");
+  const [selectedTaskPage, setSelectedTaskPage] = useState(1);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerYear, setPickerYear] = useState(0);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const pickerPanelRef = useRef<HTMLDivElement>(null);
   const pickerTriggerRef = useRef<HTMLButtonElement>(null);
+  const isMobile = useSyncExternalStore(subscribeMobile, getIsMobile, () => false);
 
   const year = viewState?.year ?? today?.getFullYear() ?? 0;
   const month = viewState?.month ?? today?.getMonth() ?? 0;
@@ -91,6 +104,19 @@ export function CalendarView({ tasks }: CalendarViewProps) {
   });
 
   const selectedTasks = datedTasks.filter((item) => key(item.date) === selected);
+  const tasksPerPage = isMobile ? 3 : 5;
+  const selectedTaskPageCount = Math.max(
+    1,
+    Math.ceil(selectedTasks.length / tasksPerPage),
+  );
+  const currentSelectedTaskPage = Math.min(
+    selectedTaskPage,
+    selectedTaskPageCount,
+  );
+  const pagedSelectedTasks = selectedTasks.slice(
+    (currentSelectedTaskPage - 1) * tasksPerPage,
+    currentSelectedTaskPage * tasksPerPage,
+  );
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -129,6 +155,7 @@ export function CalendarView({ tasks }: CalendarViewProps) {
       month: normalized.getMonth(),
     });
     setSelectedState(key(normalized));
+    setSelectedTaskPage(1);
   }
 
   function shiftMonths(delta: number) {
@@ -143,6 +170,12 @@ export function CalendarView({ tasks }: CalendarViewProps) {
     if (!today) return;
     setViewState({ year: today.getFullYear(), month: today.getMonth() });
     setSelectedState(key(today));
+    setSelectedTaskPage(1);
+  }
+
+  function selectDate(dateKey: string) {
+    setSelectedState(dateKey);
+    setSelectedTaskPage(1);
   }
 
   function openPicker() {
@@ -379,7 +412,7 @@ export function CalendarView({ tasks }: CalendarViewProps) {
           return (
             <button
               key={dateKey}
-              onClick={() => setSelectedState(dateKey)}
+              onClick={() => selectDate(dateKey)}
               aria-pressed={active}
               aria-label={`${date.getDate()} ${THAI_MONTHS_FULL[date.getMonth()]}${count > 0 ? ` มี ${count} งาน` : ""}`}
               className={`focus-ring flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl border py-1 transition sm:min-h-14 ${
@@ -420,7 +453,7 @@ export function CalendarView({ tasks }: CalendarViewProps) {
         </p>
         {selectedTasks.length > 0 ? (
           <div className="mt-2 space-y-2">
-            {selectedTasks.map(({ task, date }) => (
+            {pagedSelectedTasks.map(({ task, date }) => (
               <div key={task.id} className="rounded-xl bg-paper px-3 py-2">
                 <p className="text-[12px] font-semibold text-ink">{task.title}</p>
                 <p className="mt-0.5 text-[10px] text-muted">
@@ -429,6 +462,33 @@ export function CalendarView({ tasks }: CalendarViewProps) {
                 </p>
               </div>
             ))}
+            {selectedTaskPageCount > 1 && (
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <button
+                  onClick={() =>
+                    setSelectedTaskPage((page) => Math.max(1, page - 1))
+                  }
+                  disabled={currentSelectedTaskPage === 1}
+                  className="focus-ring rounded-full border border-line bg-paper px-3 py-1.5 text-[10.5px] font-semibold text-navy transition hover:border-blue disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ← ก่อนหน้า
+                </button>
+                <span className="text-[10px] font-medium text-muted">
+                  หน้า {currentSelectedTaskPage} / {selectedTaskPageCount}
+                </span>
+                <button
+                  onClick={() =>
+                    setSelectedTaskPage((page) =>
+                      Math.min(selectedTaskPageCount, page + 1),
+                    )
+                  }
+                  disabled={currentSelectedTaskPage === selectedTaskPageCount}
+                  className="focus-ring rounded-full border border-line bg-paper px-3 py-1.5 text-[10.5px] font-semibold text-navy transition hover:border-blue disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ถัดไป →
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <p className="mt-1 text-[11px] text-muted">
