@@ -231,12 +231,17 @@ export function CalendarView({ tasks }: CalendarViewProps) {
             </button>
 
             {pickerOpen && (
-              <div
-                ref={pickerPanelRef}
-                role="dialog"
-                aria-label="เลือกเดือนและปี"
-                className="surface soft-shadow thin-scroll fixed bottom-3 left-1/2 z-40 max-h-[min(340px,62vh)] w-[min(264px,calc(100vw-2rem))] -translate-x-1/2 overflow-y-auto rounded-2xl p-2.5 sm:absolute sm:bottom-auto sm:left-1/2 sm:mt-2 sm:max-h-none sm:w-[268px] sm:-translate-x-1/2"
-              >
+              <>
+                <div
+                  className="fixed inset-0 z-30 bg-navy/10 backdrop-blur-[1px] sm:hidden"
+                  aria-hidden="true"
+                />
+                <div
+                  ref={pickerPanelRef}
+                  role="dialog"
+                  aria-label="เลือกเดือนและปี"
+                  className="surface soft-shadow thin-scroll fixed left-1/2 top-1/2 z-40 max-h-[min(340px,62vh)] w-[min(264px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl p-2.5 sm:absolute sm:left-1/2 sm:top-auto sm:mt-2 sm:max-h-none sm:w-[268px] sm:translate-y-0"
+                >
                   <div className="mb-1.5 flex items-center justify-between border-b border-line pb-1.5">
                     <p className="text-[10px] font-semibold text-muted">
                       เลือกเดือนและปี
@@ -315,6 +320,7 @@ export function CalendarView({ tasks }: CalendarViewProps) {
                     </button>
                   </div>
                 </div>
+              </>
             )}
           </div>
 
