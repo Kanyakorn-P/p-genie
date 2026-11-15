@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type FormEvent,
 } from "react";
 import { NO_SUBJECT, subjectLabel, type Task } from "@/lib/data";
 import { parseTasks } from "@/lib/parse";
@@ -36,6 +37,7 @@ import {
   signOutNow,
   toAccountUser,
   updateTaskDue,
+  submitFeedback,
   type AccountUser,
 } from "@/lib/supabase";
 import { askGenie, type AiMode } from "@/lib/genie-ai";
@@ -257,6 +259,12 @@ export function GenieApp() {
   const [thinking, setThinking] = useState(false);
   const [pendingDueTaskIds, setPendingDueTaskIds] = useState<string[]>([]);
   const [contactOpen, setContactOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackCategory, setFeedbackCategory] = useState<
+    "idea" | "issue" | "other"
+  >("idea");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackSending, setFeedbackSending] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [onboarding, setOnboarding] = useState<"ask" | "guide" | null>("ask");
   const [onboardingStep, setOnboardingStep] = useState(0);
@@ -406,6 +414,29 @@ export function GenieApp() {
   function flash(message: string) {
     setToast(message);
     window.setTimeout(() => setToast(null), 2400);
+  }
+
+  async function sendFeedback(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const message = feedbackMessage.trim();
+    if (!message || feedbackSending) return;
+
+    setFeedbackSending(true);
+    try {
+      const result = await submitFeedback(message, feedbackCategory);
+      if (result.error) {
+        flash(result.error);
+        return;
+      }
+      setFeedbackMessage("");
+      setFeedbackCategory("idea");
+      setFeedbackOpen(false);
+      flash("ขอบคุณสำหรับ Feedback นะ ✨");
+    } catch {
+      flash("ส่ง Feedback ไม่สำเร็จ ลองใหม่อีกครั้งนะ");
+    } finally {
+      setFeedbackSending(false);
+    }
   }
 
   const todayLabel = mounted ? formatToday(new Date()) : "";
@@ -1855,6 +1886,16 @@ export function GenieApp() {
           >
             Contact us
           </button>
+          <span className="mx-1">·</span>
+          <button
+            onClick={() => {
+              setContactOpen(false);
+              setFeedbackOpen(true);
+            }}
+            className="font-semibold text-navy underline decoration-line underline-offset-2 transition hover:text-blue"
+          >
+            ส่ง Feedback
+          </button>
           {contactOpen && (
             <>
               <button
@@ -1910,6 +1951,80 @@ export function GenieApp() {
           )}
         </footer>
       </div>
+
+      {feedbackOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-navy/30 px-4 py-6 backdrop-blur-[2px]">
+          <button
+            aria-label="ปิดหน้าส่ง Feedback"
+            onClick={() => setFeedbackOpen(false)}
+            className="absolute inset-0 cursor-default"
+          />
+          <form
+            onSubmit={sendFeedback}
+            className="soft-shadow relative z-10 w-full max-w-[420px] rounded-3xl border border-line bg-paper p-5 text-left"
+            aria-labelledby="feedback-title"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 id="feedback-title" className="font-mali text-xl font-bold text-navy">
+                  ส่ง Feedback ให้พี่จินนี่
+                </h2>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                  บอกได้เลยว่าอยากให้ปรับอะไร หรือเจอปัญหาตรงไหน ✨
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFeedbackOpen(false)}
+                aria-label="ปิด"
+                className="focus-ring rounded-full p-1 text-muted hover:bg-cream hover:text-navy"
+              >
+                <IconClose size={17} />
+              </button>
+            </div>
+            <label className="mt-4 block text-[11px] font-semibold text-navy" htmlFor="feedback-category">
+              ประเภท
+            </label>
+            <select
+              id="feedback-category"
+              value={feedbackCategory}
+              onChange={(event) =>
+                setFeedbackCategory(event.target.value as "idea" | "issue" | "other")
+              }
+              className="focus-ring mt-1 w-full rounded-xl border border-line bg-white px-3 py-2.5 text-[12px] text-ink"
+            >
+              <option value="idea">ข้อเสนอแนะ</option>
+              <option value="issue">แจ้งปัญหา</option>
+              <option value="other">อื่น ๆ</option>
+            </select>
+            <label className="mt-3 block text-[11px] font-semibold text-navy" htmlFor="feedback-message">
+              รายละเอียด
+            </label>
+            <textarea
+              id="feedback-message"
+              value={feedbackMessage}
+              onChange={(event) => setFeedbackMessage(event.target.value)}
+              maxLength={2000}
+              required
+              rows={5}
+              placeholder="พิมพ์ Feedback ได้เลย..."
+              className="focus-ring mt-1 w-full resize-y rounded-xl border border-line bg-white px-3 py-2.5 text-[12px] leading-relaxed text-ink placeholder:text-muted/70"
+            />
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <span className="text-[10px] text-muted">
+                {feedbackMessage.length}/2000
+              </span>
+              <button
+                type="submit"
+                disabled={!feedbackMessage.trim() || feedbackSending}
+                className="focus-ring rounded-full bg-navy px-4 py-2 text-[11px] font-semibold text-white transition hover:bg-navy-deep disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {feedbackSending ? "กำลังส่ง..." : "ส่ง Feedback"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {mounted && !onboardingDismissed && onboarding && (
         <div className="fixed inset-0 z-[60] grid place-items-center bg-navy/25 px-4 backdrop-blur-[2px]">

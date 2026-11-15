@@ -145,6 +145,29 @@ export async function currentUserId(): Promise<string | null> {
   return data.session?.user.id ?? null;
 }
 
+export async function submitFeedback(
+  message: string,
+  category: "idea" | "issue" | "other",
+): Promise<{ error: string | null }> {
+  const supabase = getSupabase();
+  if (!supabase) {
+    return { error: "ระบบรับ Feedback ยังไม่พร้อมใช้งาน" };
+  }
+
+  const { error } = await supabase.from("feedback").insert({
+    owner_token: ownerToken(),
+    user_id: await currentUserId(),
+    category,
+    message: message.trim(),
+  });
+
+  return {
+    error: error
+      ? "ส่ง Feedback ไม่สำเร็จ ลองใหม่อีกครั้งนะ"
+      : null,
+  };
+}
+
 // งานที่จดไว้ตอนยังไม่ล็อกอิน ย้ายเข้าบัญชีให้อัตโนมัติครั้งแรก
 export async function claimGuestData(userId: string): Promise<void> {
   const supabase = getSupabase();
