@@ -235,16 +235,16 @@ export function CalendarView({ tasks }: CalendarViewProps) {
                 ref={pickerPanelRef}
                 role="dialog"
                 aria-label="เลือกเดือนและปี"
-                className="surface soft-shadow thin-scroll fixed bottom-3 left-1/2 z-40 max-h-[min(430px,70vh)] w-[min(292px,calc(100vw-2rem))] -translate-x-1/2 overflow-y-auto rounded-2xl p-3 sm:absolute sm:bottom-auto sm:left-1/2 sm:mt-2 sm:max-h-none sm:w-[268px] sm:-translate-x-1/2"
+                className="surface soft-shadow thin-scroll fixed bottom-3 left-1/2 z-40 max-h-[min(340px,62vh)] w-[min(264px,calc(100vw-2rem))] -translate-x-1/2 overflow-y-auto rounded-2xl p-2.5 sm:absolute sm:bottom-auto sm:left-1/2 sm:mt-2 sm:max-h-none sm:w-[268px] sm:-translate-x-1/2"
               >
-                  <div className="mb-2 flex items-center justify-between border-b border-line pb-2">
-                    <p className="text-[11px] font-semibold text-muted">
+                  <div className="mb-1.5 flex items-center justify-between border-b border-line pb-1.5">
+                    <p className="text-[10px] font-semibold text-muted">
                       เลือกเดือนและปี
                     </p>
                     <button
                       onClick={() => setPickerOpen(false)}
                       aria-label="ปิดตัวเลือกเดือน"
-                      className="focus-ring grid h-8 w-8 place-items-center rounded-full border border-line bg-paper text-[18px] leading-none text-muted transition hover:bg-cream hover:text-navy"
+                      className="focus-ring grid h-7 w-7 place-items-center rounded-full border border-line bg-paper text-[16px] leading-none text-muted transition hover:bg-cream hover:text-navy"
                     >
                       ×
                     </button>
@@ -253,26 +253,26 @@ export function CalendarView({ tasks }: CalendarViewProps) {
                     <button
                       onClick={() => setPickerYear((prev) => prev - 1)}
                       aria-label="ย้อนไปปีก่อนหน้า"
-                      className="focus-ring grid h-9 w-9 place-items-center rounded-full border border-line text-[15px] leading-none text-navy transition hover:border-blue"
+                      className="focus-ring grid h-8 w-8 place-items-center rounded-full border border-line text-[14px] leading-none text-navy transition hover:border-blue"
                     >
                       «
                     </button>
                     <div className="text-center">
-                      <p className="text-[13px] font-bold text-navy">
+                      <p className="text-[12px] font-bold text-navy">
                         {pickerYear + 543}
                       </p>
-                      <p className="text-[9.5px] text-muted">พ.ศ.</p>
+                      <p className="text-[9px] text-muted">พ.ศ.</p>
                     </div>
                     <button
                       onClick={() => setPickerYear((prev) => prev + 1)}
                       aria-label="ไปปีถัดไป"
-                      className="focus-ring grid h-9 w-9 place-items-center rounded-full border border-line text-[15px] leading-none text-navy transition hover:border-blue"
+                      className="focus-ring grid h-8 w-8 place-items-center rounded-full border border-line text-[14px] leading-none text-navy transition hover:border-blue"
                     >
                       »
                     </button>
                   </div>
 
-                  <div className="mt-2 grid grid-cols-3 gap-1.5">
+                  <div className="mt-1.5 grid grid-cols-3 gap-1">
                     {THAI_MONTHS_SHORT.map((monthName, monthIndex) => {
                       const active = pickerYear === year && monthIndex === month;
                       const isThisMonth =
@@ -283,7 +283,7 @@ export function CalendarView({ tasks }: CalendarViewProps) {
                           key={monthName}
                           onClick={() => pickMonth(monthIndex)}
                           aria-pressed={active}
-                          className={`focus-ring h-9 rounded-xl border text-[11.5px] font-semibold transition ${
+                          className={`focus-ring h-8 rounded-lg border text-[10.5px] font-semibold transition sm:h-9 sm:rounded-xl sm:text-[11.5px] ${
                             active
                               ? "border-blue bg-blue-soft text-navy"
                               : isThisMonth
@@ -297,10 +297,10 @@ export function CalendarView({ tasks }: CalendarViewProps) {
                     })}
                   </div>
 
-                  <div className="mt-3 flex gap-2">
+                  <div className="mt-2 flex gap-1.5">
                     <button
                       onClick={() => setPickerYear(today.getFullYear())}
-                      className="focus-ring flex-1 rounded-full border border-line px-3 py-1.5 text-[10.5px] font-semibold text-navy transition hover:border-blue"
+                      className="focus-ring flex-1 rounded-full border border-line px-2.5 py-1 text-[10px] font-semibold text-navy transition hover:border-blue sm:px-3 sm:py-1.5 sm:text-[10.5px]"
                     >
                       ปีนี้
                     </button>
@@ -309,7 +309,7 @@ export function CalendarView({ tasks }: CalendarViewProps) {
                         setPickerOpen(false);
                         goToday();
                       }}
-                      className="focus-ring flex-1 rounded-full bg-navy px-3 py-1.5 text-[10.5px] font-semibold text-paper transition hover:bg-navy-deep"
+                      className="focus-ring flex-1 rounded-full bg-navy px-2.5 py-1 text-[10px] font-semibold text-paper transition hover:bg-navy-deep sm:px-3 sm:py-1.5 sm:text-[10.5px]"
                     >
                       วันนี้
                     </button>

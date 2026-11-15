@@ -287,6 +287,7 @@ export function GenieApp() {
   const chatInputRef = useRef<HTMLInputElement>(null);
   const mounted = useMounted();
   const wide = useMediaQuery("(min-width: 1280px)");
+  const mobile = useMediaQuery("(max-width: 639px)");
 
   useEffect(() => {
     let alive = true;
@@ -464,11 +465,15 @@ export function GenieApp() {
         return aCreated - bCreated;
       });
   }, [tasks, filter, query, folders]);
-  const taskPageCount = Math.max(1, Math.ceil(visibleTasks.length / 5));
+  const tasksPerPage = mobile ? 3 : 5;
+  const taskPageCount = Math.max(
+    1,
+    Math.ceil(visibleTasks.length / tasksPerPage),
+  );
   const currentTaskPage = Math.min(taskPage, taskPageCount);
   const pagedTasks = visibleTasks.slice(
-    (currentTaskPage - 1) * 5,
-    currentTaskPage * 5,
+    (currentTaskPage - 1) * tasksPerPage,
+    currentTaskPage * tasksPerPage,
   );
 
   const tomorrowTasks = useMemo(
@@ -1274,7 +1279,7 @@ export function GenieApp() {
 
         <div className="content-pattern flex min-w-0 flex-1 items-start gap-5 px-4 py-5 pb-24 sm:px-6 lg:pb-5">
           <main className="grid min-w-0 flex-1 grid-cols-2 items-start gap-3 sm:flex sm:flex-col sm:items-stretch sm:gap-5">
-            <section className="order-0 col-span-1 surface soft-shadow relative overflow-hidden p-4 sm:col-span-2 sm:p-6">
+            <section className="order-0 col-span-2 surface soft-shadow relative overflow-hidden p-4 sm:p-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <span className="hidden items-center gap-1.5 rounded-full bg-yellow-soft px-3 py-1 text-[10.5px] font-semibold text-[#8a6410] sm:inline-flex">
@@ -1651,7 +1656,7 @@ export function GenieApp() {
 
             <section
               id="reminder"
-              className="order-1 col-span-1 scroll-mt-24 sm:col-span-2"
+              className="order-1 col-span-2 scroll-mt-24"
             >
               <div className="surface soft-shadow p-4 sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2">
@@ -1669,8 +1674,8 @@ export function GenieApp() {
                   </span>
                 </div>
 
-                <div className="mt-2.5 grid grid-cols-4 gap-1 sm:mt-4 sm:grid-cols-7 sm:gap-2">
-                  {week.map((d, weekIndex) => {
+                <div className="mt-2.5 grid grid-cols-7 gap-1 sm:mt-4 sm:gap-2">
+                  {week.map((d) => {
                     const dots = Math.min(
                       tasks.filter(
                         (t) =>
@@ -1693,7 +1698,7 @@ export function GenieApp() {
                           active
                             ? "bg-navy text-paper"
                             : "bg-cream text-ink hover:bg-cream-deep"
-                        } ${weekIndex === 4 ? "col-start-2 sm:col-auto" : ""}`}
+                        }`}
                       >
                         <span className="block truncate text-[8px] opacity-70 sm:text-[10px]">
                           {d.label}
@@ -1716,52 +1721,32 @@ export function GenieApp() {
                   })}
                 </div>
 
-                {urgentTasks.length > 0 && (
-                  <button
-                    onClick={() => {
-                      setActiveNav("tasks");
-                      scrollTo("tasks");
-                    }}
-                    className="focus-ring mt-2.5 flex w-full items-center justify-between rounded-lg bg-cream px-2.5 py-1.5 text-[9.5px] font-semibold text-navy sm:hidden"
-                  >
-                    <span>งานด่วน {urgentTasks.length} งาน</span>
-                    <span aria-hidden="true">ดูทั้งหมด →</span>
-                  </button>
-                )}
-                {ready && urgentTasks.length === 0 && (
-                  <p className="mt-2.5 rounded-lg bg-cream px-2.5 py-1.5 text-center text-[9px] text-muted sm:hidden">
-                    ไม่มีงานด่วนวันนี้
-                  </p>
-                )}
-
-                <div className="hidden sm:block">
-                  <p className="mt-4 text-[12px] font-semibold text-navy">
-                    งานที่ต้องส่งเร็ว ๆ นี้
-                  </p>
-                  <div className="mt-2 space-y-2">
-                    {!ready && (
-                      <p className="rounded-2xl border border-dashed border-line px-4 py-4 text-center text-[11.5px] text-muted">
-                        กำลังโหลด...
-                      </p>
-                    )}
-                    {ready && urgentTasks.length === 0 && (
-                      <p className="rounded-2xl border border-dashed border-line px-4 py-4 text-center text-[11.5px] text-muted">
-                        ยังไม่มีงานที่ต้องส่งวันนี้หรือพรุ่งนี้ พิมพ์ในแชทเพื่อเพิ่มได้เลย
-                      </p>
-                    )}
-                    {urgentTasks.map((t) => (
-                      <TaskRow
-                        key={t.id}
-                        task={t}
-                        color={
-                          folderForSubject(t.subject, folders)?.color ??
-                          colorForName(t.subject, folders)
-                        }
-                        onToggle={toggle}
-                        onDelete={askDeleteTask}
-                      />
-                    ))}
-                  </div>
+                <p className="mt-3 text-[11px] font-semibold text-navy sm:mt-4 sm:text-[12px]">
+                  งานที่ต้องส่งเร็ว ๆ นี้
+                </p>
+                <div className="mt-2 space-y-2">
+                  {!ready && (
+                    <p className="rounded-2xl border border-dashed border-line px-4 py-3 text-center text-[11px] text-muted sm:py-4 sm:text-[11.5px]">
+                      กำลังโหลด...
+                    </p>
+                  )}
+                  {ready && urgentTasks.length === 0 && (
+                    <p className="rounded-2xl border border-dashed border-line px-3 py-3 text-center text-[10.5px] text-muted sm:px-4 sm:py-4 sm:text-[11.5px]">
+                      ยังไม่มีงานที่ต้องส่งวันนี้หรือพรุ่งนี้ พิมพ์ในแชทเพื่อเพิ่มได้เลย
+                    </p>
+                  )}
+                  {urgentTasks.map((t) => (
+                    <TaskRow
+                      key={t.id}
+                      task={t}
+                      color={
+                        folderForSubject(t.subject, folders)?.color ??
+                        colorForName(t.subject, folders)
+                      }
+                      onToggle={toggle}
+                      onDelete={askDeleteTask}
+                    />
+                  ))}
                 </div>
               </div>
             </section>
