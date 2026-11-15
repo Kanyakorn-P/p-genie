@@ -1273,15 +1273,15 @@ export function GenieApp() {
         </header>
 
         <div className="content-pattern flex min-w-0 flex-1 items-start gap-5 px-4 py-5 pb-24 sm:px-6 lg:pb-5">
-          <main className="flex min-w-0 flex-1 flex-col space-y-5">
-            <section className="order-0 surface soft-shadow relative overflow-hidden p-5 sm:p-6">
+          <main className="grid min-w-0 flex-1 grid-cols-2 items-start gap-3 sm:flex sm:flex-col sm:items-stretch sm:gap-5">
+            <section className="order-0 col-span-1 surface soft-shadow relative overflow-hidden p-4 sm:col-span-2 sm:p-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-soft px-3 py-1 text-[10.5px] font-semibold text-[#8a6410]">
+                  <span className="hidden items-center gap-1.5 rounded-full bg-yellow-soft px-3 py-1 text-[10.5px] font-semibold text-[#8a6410] sm:inline-flex">
                     <IconSparkle size={12} />
                     พร้อมช่วยจดการบ้านทุกวัน
                   </span>
-                  <h1 className="mt-3 text-[22px] font-bold leading-snug text-ink sm:text-[26px]">
+                  <h1 className="text-[15px] font-bold leading-snug text-ink sm:mt-3 sm:text-[26px]">
                     {pending === 0 ? (
                       <>
                         หวัดดีจ้า! ตอนนี้ยังไม่มีงานค้าง{" "}
@@ -1294,16 +1294,21 @@ export function GenieApp() {
                       </>
                     )}
                   </h1>
-                  <p className="mt-1 text-[12px] text-muted">{todayLabel}</p>
+                  <p className="mt-1 text-[9.5px] text-muted sm:text-[12px]">
+                    {todayLabel}
+                  </p>
 
-                  <div className="mt-4 max-w-md">
-                    <div className="flex justify-between text-[11px] font-medium text-muted">
-                      <span>ความคืบหน้าการบ้านทั้งหมด</span>
+                  <div className="mt-3 max-w-md sm:mt-4">
+                    <div className="flex items-center justify-between gap-1 text-[9.5px] font-medium text-muted sm:text-[11px]">
+                      <span className="hidden sm:inline">
+                        ความคืบหน้าการบ้านทั้งหมด
+                      </span>
+                      <span className="sm:hidden">คืบหน้า</span>
                       <span className="font-semibold text-navy">
-                        {done}/{total} งาน ({percent}%)
+                        {done}/{total} ({percent}%)
                       </span>
                     </div>
-                    <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-cream-deep">
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-cream-deep sm:mt-1.5 sm:h-2.5">
                       <div
                         className="h-full rounded-full bg-blue transition-all"
                         style={{ width: `${percent}%` }}
@@ -1311,8 +1316,8 @@ export function GenieApp() {
                     </div>
                   </div>
 
-                  <div className="mt-4 flex flex-wrap gap-2 text-[11px]">
-                    <span className="rounded-full bg-cream px-3 py-1 font-medium text-muted">
+                  <div className="mt-3 flex flex-wrap gap-1.5 text-[9.5px] sm:mt-4 sm:gap-2 sm:text-[11px]">
+                    <span className="rounded-full bg-cream px-2 py-0.5 font-medium text-muted sm:px-3 sm:py-1">
                       ค้าง {pending}
                     </span>
                     <button
@@ -1321,11 +1326,11 @@ export function GenieApp() {
                         setActiveNav("tasks");
                         scrollTo("tasks");
                       }}
-                      className="focus-ring rounded-full bg-cream px-3 py-1 font-medium text-muted transition hover:bg-yellow-soft"
+                      className="focus-ring rounded-full bg-cream px-2 py-0.5 font-medium text-muted transition hover:bg-yellow-soft sm:px-3 sm:py-1"
                     >
                       ส่งพรุ่งนี้ {tomorrowTasks.length}
                     </button>
-                    <span className="rounded-full bg-cream px-3 py-1 font-medium text-muted">
+                    <span className="hidden rounded-full bg-cream px-3 py-1 font-medium text-muted sm:inline">
                       เสร็จแล้ว {done}
                     </span>
                   </div>
@@ -1337,11 +1342,11 @@ export function GenieApp() {
               </div>
             </section>
 
-            <section id="tasks" className="order-2 scroll-mt-24">
-              <div className="surface soft-shadow p-5">
+            <section id="tasks" className="order-2 col-span-2 scroll-mt-24">
+              <div className="surface soft-shadow p-4 sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <h2 className="text-[17px] font-bold text-navy">
+                    <h2 className="text-[15px] font-bold text-navy sm:text-[17px]">
                       การบ้านทั้งหมด
                     </h2>
                     <p className="text-[11.5px] text-muted">
@@ -1482,11 +1487,11 @@ export function GenieApp() {
               </div>
             </section>
 
-            <section className="order-4">
-              <div className="surface soft-shadow p-5">
+            <section className="order-4 col-span-2">
+              <div className="surface soft-shadow p-4 sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <h2 className="text-[17px] font-bold text-navy">
+                    <h2 className="text-[15px] font-bold text-navy sm:text-[17px]">
                       สรุปความคืบหน้า
                     </h2>
                     <p className="text-[11.5px] text-muted">
@@ -1563,11 +1568,11 @@ export function GenieApp() {
               </div>
             </section>
 
-            <section className="order-5">
-              <div className="surface soft-shadow p-5">
+            <section className="order-5 col-span-2">
+              <div className="surface soft-shadow p-4 sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <h2 className="text-[17px] font-bold text-navy">
+                    <h2 className="text-[15px] font-bold text-navy sm:text-[17px]">
                       โฟลเดอร์วิชา ({folders.length})
                     </h2>
                     <p className="text-[11.5px] text-muted">
@@ -1644,21 +1649,27 @@ export function GenieApp() {
               </div>
             </section>
 
-            <section id="reminder" className="order-1 scroll-mt-24">
-              <div className="surface soft-shadow p-5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
+            <section
+              id="reminder"
+              className="order-1 col-span-1 scroll-mt-24 sm:col-span-2"
+            >
+              <div className="surface soft-shadow p-4 sm:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2">
                   <div>
-                    <h2 className="text-[17px] font-bold text-navy">
-                      กำหนดการสัปดาห์นี้
+                    <h2 className="text-[13px] font-bold text-navy sm:text-[17px]">
+                      <span className="sm:hidden">สัปดาห์นี้</span>
+                      <span className="hidden sm:inline">กำหนดการสัปดาห์นี้</span>
                     </h2>
-                    <p className="text-[11.5px] text-muted">{todayLabel}</p>
+                    <p className="hidden text-[11.5px] text-muted sm:block">
+                      {todayLabel}
+                    </p>
                   </div>
-                  <span className="rounded-full bg-red-soft px-3 py-1 text-[10.5px] font-semibold text-red">
+                  <span className="rounded-full bg-red-soft px-2 py-0.5 text-[9px] font-semibold text-red sm:px-3 sm:py-1 sm:text-[10.5px]">
                     ส่งพรุ่งนี้ {tomorrowTasks.length} งาน
                   </span>
                 </div>
 
-                <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-7">
+                <div className="mt-2.5 grid grid-cols-4 gap-1 sm:mt-4 sm:grid-cols-7 sm:gap-2">
                   {week.map((d) => {
                     const dots = Math.min(
                       tasks.filter(
@@ -1678,19 +1689,19 @@ export function GenieApp() {
                           )
                         }
                         aria-pressed={active}
-                        className={`focus-ring rounded-xl px-1 py-2 text-center transition ${
+                        className={`focus-ring rounded-lg px-0.5 py-1.5 text-center transition sm:rounded-xl sm:px-1 sm:py-2 ${
                           active
                             ? "bg-navy text-paper"
                             : "bg-cream text-ink hover:bg-cream-deep"
                         }`}
                       >
-                        <span className="block text-[10px] opacity-70">
+                        <span className="block truncate text-[8px] opacity-70 sm:text-[10px]">
                           {d.label}
                         </span>
-                        <span className="block font-mali text-[15px] font-bold">
+                        <span className="block font-mali text-[12.5px] font-bold sm:text-[15px]">
                           {d.day}
                         </span>
-                        <span className="mt-0.5 flex justify-center gap-0.5">
+                        <span className="mt-0.5 flex min-h-1 justify-center gap-0.5">
                           {Array.from({ length: dots }).map((_, i) => (
                             <span
                               key={i}
@@ -1705,32 +1716,52 @@ export function GenieApp() {
                   })}
                 </div>
 
-                <p className="mt-4 text-[12px] font-semibold text-navy">
-                  งานที่ต้องส่งเร็ว ๆ นี้
-                </p>
-                <div className="mt-2 space-y-2">
-                  {!ready && (
-                    <p className="rounded-2xl border border-dashed border-line px-4 py-4 text-center text-[11.5px] text-muted">
-                      กำลังโหลด...
-                    </p>
-                  )}
-                  {ready && urgentTasks.length === 0 && (
-                    <p className="rounded-2xl border border-dashed border-line px-4 py-4 text-center text-[11.5px] text-muted">
-                      ยังไม่มีงานที่ต้องส่งวันนี้หรือพรุ่งนี้ พิมพ์ในแชทเพื่อเพิ่มได้เลย
-                    </p>
-                  )}
-                  {urgentTasks.map((t) => (
-                    <TaskRow
-                      key={t.id}
-                      task={t}
-                      color={
-                        folderForSubject(t.subject, folders)?.color ??
-                        colorForName(t.subject, folders)
-                      }
-                      onToggle={toggle}
-                      onDelete={askDeleteTask}
-                    />
-                  ))}
+                {urgentTasks.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setActiveNav("tasks");
+                      scrollTo("tasks");
+                    }}
+                    className="focus-ring mt-2.5 flex w-full items-center justify-between rounded-lg bg-cream px-2.5 py-1.5 text-[9.5px] font-semibold text-navy sm:hidden"
+                  >
+                    <span>งานด่วน {urgentTasks.length} งาน</span>
+                    <span aria-hidden="true">ดูทั้งหมด →</span>
+                  </button>
+                )}
+                {ready && urgentTasks.length === 0 && (
+                  <p className="mt-2.5 rounded-lg bg-cream px-2.5 py-1.5 text-center text-[9px] text-muted sm:hidden">
+                    ไม่มีงานด่วนวันนี้
+                  </p>
+                )}
+
+                <div className="hidden sm:block">
+                  <p className="mt-4 text-[12px] font-semibold text-navy">
+                    งานที่ต้องส่งเร็ว ๆ นี้
+                  </p>
+                  <div className="mt-2 space-y-2">
+                    {!ready && (
+                      <p className="rounded-2xl border border-dashed border-line px-4 py-4 text-center text-[11.5px] text-muted">
+                        กำลังโหลด...
+                      </p>
+                    )}
+                    {ready && urgentTasks.length === 0 && (
+                      <p className="rounded-2xl border border-dashed border-line px-4 py-4 text-center text-[11.5px] text-muted">
+                        ยังไม่มีงานที่ต้องส่งวันนี้หรือพรุ่งนี้ พิมพ์ในแชทเพื่อเพิ่มได้เลย
+                      </p>
+                    )}
+                    {urgentTasks.map((t) => (
+                      <TaskRow
+                        key={t.id}
+                        task={t}
+                        color={
+                          folderForSubject(t.subject, folders)?.color ??
+                          colorForName(t.subject, folders)
+                        }
+                        onToggle={toggle}
+                        onDelete={askDeleteTask}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             </section>
@@ -1738,7 +1769,7 @@ export function GenieApp() {
             <CalendarView tasks={tasks} />
 
             {!wide && (
-              <section id="chat" className="order-6 scroll-mt-24">
+              <section id="chat" className="order-6 col-span-2 scroll-mt-24">
                 <div className="surface soft-shadow flex flex-col p-4">
                   {chatPanel}
                 </div>

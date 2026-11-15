@@ -52,6 +52,8 @@ export function CalendarView({ tasks }: CalendarViewProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerYear, setPickerYear] = useState(0);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const pickerPanelRef = useRef<HTMLDivElement>(null);
+  const pickerTriggerRef = useRef<HTMLButtonElement>(null);
 
   const year = viewState?.year ?? today?.getFullYear() ?? 0;
   const month = viewState?.month ?? today?.getMonth() ?? 0;
@@ -99,6 +101,25 @@ export function CalendarView({ tasks }: CalendarViewProps) {
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
+  }, [pickerOpen]);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (
+        pickerPanelRef.current?.contains(target) ||
+        pickerTriggerRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setPickerOpen(false);
+    }
+
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [pickerOpen]);
 
   function goTo(nextYear: number, nextMonth: number) {
@@ -170,11 +191,13 @@ export function CalendarView({ tasks }: CalendarViewProps) {
   const selectedIsToday = key(selectedDate) === key(today);
 
   return (
-    <section className="order-3 surface soft-shadow p-4 sm:p-5">
+    <section className="order-3 col-span-2 surface soft-shadow p-3 sm:col-span-2 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-[17px] font-bold text-navy">ปฏิทินการบ้าน</h2>
-          <p className="text-[11.5px] text-muted">
+          <h2 className="text-[15px] font-bold text-navy sm:text-[17px]">
+            ปฏิทินการบ้าน
+          </h2>
+          <p className="hidden text-[11.5px] text-muted sm:block">
             กดชื่อเดือนเพื่อเลือกเดือน/ปี หรือปัดซ้ายขวาก็ได้
           </p>
         </div>
@@ -190,6 +213,7 @@ export function CalendarView({ tasks }: CalendarViewProps) {
 
           <div className="relative">
             <button
+              ref={pickerTriggerRef}
               onClick={openPicker}
               aria-expanded={pickerOpen}
               aria-haspopup="dialog"
@@ -207,17 +231,24 @@ export function CalendarView({ tasks }: CalendarViewProps) {
             </button>
 
             {pickerOpen && (
-              <>
-                <button
-                  className="fixed inset-0 z-30 cursor-default"
-                  aria-label="ปิดตัวเลือกเดือน"
-                  onClick={() => setPickerOpen(false)}
-                />
-                <div
-                  role="dialog"
-                  aria-label="เลือกเดือนและปี"
-                  className="surface soft-shadow thin-scroll fixed bottom-3 left-3 right-3 z-40 max-h-[75vh] overflow-y-auto rounded-2xl p-3 sm:absolute sm:bottom-auto sm:left-auto sm:right-0 sm:mt-2 sm:w-[268px]"
-                >
+              <div
+                ref={pickerPanelRef}
+                role="dialog"
+                aria-label="เลือกเดือนและปี"
+                className="surface soft-shadow thin-scroll fixed bottom-3 left-1/2 z-40 max-h-[min(430px,70vh)] w-[min(292px,calc(100vw-2rem))] -translate-x-1/2 overflow-y-auto rounded-2xl p-3 sm:absolute sm:bottom-auto sm:left-1/2 sm:mt-2 sm:max-h-none sm:w-[268px] sm:-translate-x-1/2"
+              >
+                  <div className="mb-2 flex items-center justify-between border-b border-line pb-2">
+                    <p className="text-[11px] font-semibold text-muted">
+                      เลือกเดือนและปี
+                    </p>
+                    <button
+                      onClick={() => setPickerOpen(false)}
+                      aria-label="ปิดตัวเลือกเดือน"
+                      className="focus-ring grid h-8 w-8 place-items-center rounded-full border border-line bg-paper text-[18px] leading-none text-muted transition hover:bg-cream hover:text-navy"
+                    >
+                      ×
+                    </button>
+                  </div>
                   <div className="flex items-center justify-between gap-2">
                     <button
                       onClick={() => setPickerYear((prev) => prev - 1)}
@@ -284,7 +315,6 @@ export function CalendarView({ tasks }: CalendarViewProps) {
                     </button>
                   </div>
                 </div>
-              </>
             )}
           </div>
 
