@@ -1,7 +1,7 @@
 "use client";
 
 import { subjectLabel, type Task } from "@/lib/data";
-import { dueWithHint, isTaskUrgent } from "@/lib/due-date";
+import { isTaskUrgent, taskDueLabel } from "@/lib/due-date";
 import { toneFor, type FolderColor } from "@/lib/theme";
 import { IconCheck, IconTrash } from "./ui-icons";
 
@@ -45,7 +45,7 @@ export function TaskRow({ task, color, onToggle, onDelete }: TaskRowProps) {
             {subjectLabel(task.subject)}
           </span>
           <span className="rounded-full bg-paper px-2.5 py-0.5 text-muted">
-            {dueWithHint(task.due)}
+            {taskDueLabel(task)}
           </span>
           {isTaskUrgent(task) && !task.done && (
             <span className="rounded-full bg-red-soft px-2.5 py-0.5 font-semibold text-red">

@@ -266,6 +266,20 @@ export function dueWithHint(due: string, today: Date = new Date()) {
   return due;
 }
 
+export function taskDueLabel(
+  task: { due: string; createdAt?: string | number | null },
+  today: Date = new Date(),
+) {
+  const date = taskDueDate(task, today);
+  if (!date) return task.due;
+  const hint = describeDue(date, today);
+  const shortHint =
+    hint === "วันนี้" || hint === "พรุ่งนี้" || hint === "มะรืนนี้"
+      ? ` (${hint})`
+      : "";
+  return `${formatDueDate(date, today)}${shortHint}`;
+}
+
 export function isUrgentDue(due: string, today: Date = new Date()) {
   const date = resolveDue(due, today);
   if (!date) return false;

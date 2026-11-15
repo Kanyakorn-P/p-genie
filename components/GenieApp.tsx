@@ -48,6 +48,7 @@ import {
   parseDueAnswer,
   resolveDue,
   startOfDay,
+  taskDueLabel,
 } from "@/lib/due-date";
 import { ChatPanel, type ChatMessage } from "./ChatPanel";
 import { AccountAvatar } from "./AccountAvatar";
@@ -1189,7 +1190,7 @@ export function GenieApp() {
                           >
                             <p className="truncate font-medium">{t.title}</p>
                             <p className="text-[10.5px] text-muted">
-                              {subjectLabel(t.subject)} • {t.due}
+                              {subjectLabel(t.subject)} • {taskDueLabel(t)}
                             </p>
                           </li>
                         ))}
