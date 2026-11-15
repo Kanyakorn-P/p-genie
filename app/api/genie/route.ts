@@ -350,7 +350,9 @@ export async function POST(request: Request) {
           : [];
 
         const result: GenieResult = { tasks: tasks.slice(0, 8), reply, folders };
-        return NextResponse.json(result);
+        return NextResponse.json(result, {
+          headers: { "x-genie-model": model, "x-genie-mode": mode },
+        });
       } catch (error) {
         lastError = error instanceof Error ? error.message : "ต่อ Gemini ไม่ได้";
       }
