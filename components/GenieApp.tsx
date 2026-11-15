@@ -239,6 +239,7 @@ export function GenieApp() {
 
   const [query, setQuery] = useState("");
   const [taskPage, setTaskPage] = useState(1);
+  const [folderPage, setFolderPage] = useState(1);
   const [filter, setFilter] = useState<Filter>(null);
   const [activeNav, setActiveNav] = useState<NavKey>("home");
   const [dialog, setDialog] = useState<
@@ -474,6 +475,16 @@ export function GenieApp() {
   const pagedTasks = visibleTasks.slice(
     (currentTaskPage - 1) * tasksPerPage,
     currentTaskPage * tasksPerPage,
+  );
+  const foldersPerPage = mobile ? 3 : 5;
+  const folderPageCount = Math.max(
+    1,
+    Math.ceil(folders.length / foldersPerPage),
+  );
+  const currentFolderPage = Math.min(folderPage, folderPageCount);
+  const pagedFolders = folders.slice(
+    (currentFolderPage - 1) * foldersPerPage,
+    currentFolderPage * foldersPerPage,
   );
 
   const tomorrowTasks = useMemo(
@@ -1594,7 +1605,7 @@ export function GenieApp() {
                 </div>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {folders.map((folder) => {
+                  {pagedFolders.map((folder) => {
                     const tone = toneFor(folder.color);
                     const folderCount = counts[folder.name] ?? 0;
                     return (
@@ -1641,16 +1652,34 @@ export function GenieApp() {
                     );
                   })}
 
-                  <button
-                    onClick={() => setDialog({ mode: "create" })}
-                    className="focus-ring flex min-h-[132px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line text-muted transition hover:border-blue hover:text-blue"
-                  >
-                    <IconPlus size={20} />
-                    <span className="text-[11.5px] font-semibold">
-                      เพิ่มโฟลเดอร์วิชา
-                    </span>
-                  </button>
                 </div>
+                {folderPageCount > 1 && (
+                  <div className="mt-4 flex items-center justify-center gap-3">
+                    <button
+                      onClick={() =>
+                        setFolderPage((page) => Math.max(1, page - 1))
+                      }
+                      disabled={currentFolderPage === 1}
+                      className="focus-ring rounded-full border border-line bg-paper px-3.5 py-2 text-[11px] font-semibold text-navy transition hover:border-blue disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      ← ก่อนหน้า
+                    </button>
+                    <span className="text-[10.5px] font-medium text-muted">
+                      หน้า {currentFolderPage} / {folderPageCount}
+                    </span>
+                    <button
+                      onClick={() =>
+                        setFolderPage((page) =>
+                          Math.min(folderPageCount, page + 1),
+                        )
+                      }
+                      disabled={currentFolderPage === folderPageCount}
+                      className="focus-ring rounded-full border border-line bg-paper px-3.5 py-2 text-[11px] font-semibold text-navy transition hover:border-blue disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      ถัดไป →
+                    </button>
+                  </div>
+                )}
               </div>
             </section>
 
