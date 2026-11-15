@@ -53,6 +53,7 @@ import {
 import { ChatPanel, type ChatMessage } from "./ChatPanel";
 import { AccountAvatar } from "./AccountAvatar";
 import { CalendarView } from "./CalendarView";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { FolderDialog } from "./FolderDialog";
 import { GenieFace } from "./GenieFace";
 import { LoginPanel } from "./LoginPanel";
@@ -242,6 +243,11 @@ export function GenieApp() {
   const [activeNav, setActiveNav] = useState<NavKey>("home");
   const [dialog, setDialog] = useState<
     { mode: "create" } | { mode: "edit"; folder: Folder } | null
+  >(null);
+  const [confirmDialog, setConfirmDialog] = useState<
+    | { kind: "folder"; folder: Folder }
+    | { kind: "task"; id: string; title: string }
+    | null
   >(null);
   const [pop, setPop] = useState<"bell" | "account" | null>(null);
   const [roomCode, setRoomCode] = useState("");
@@ -550,6 +556,12 @@ export function GenieApp() {
     flash("ลบการบ้านแล้ว");
   }
 
+  function askDeleteTask(id: string) {
+    const task = tasks.find((item) => item.id === id);
+    if (!task) return;
+    setConfirmDialog({ kind: "task", id, title: task.title });
+  }
+
   function saveFolder(name: string, color: FolderColor) {
     if (!dialog) return;
 
@@ -576,19 +588,18 @@ export function GenieApp() {
     setDialog(null);
   }
 
-  function removeFolder(folder: Folder): boolean {
-    const ok = window.confirm(
-      `ลบโฟลเดอร์ "${folder.name}" ใช่ไหม?\nการบ้านในโฟลเดอร์นี้ยังอยู่ ไม่ถูกลบ`,
-    );
-    if (!ok) return false;
-
+  // ลบจริง ใช้ทั้งตอนกดยืนยันในกล่องและตอนสั่งลบผ่านแชท
+  function deleteFolderNow(folder: Folder) {
     setFolders((prev) => prev.filter((f) => f.id !== folder.id));
     if (filter?.kind === "folder" && filter.id === folder.id) {
       setFilter(null);
     }
     void deleteFolderRow(folder.id);
     flash(`ลบโฟลเดอร์ "${folder.name}" แล้ว`);
-    return true;
+  }
+
+  function askDeleteFolder(folder: Folder) {
+    setConfirmDialog({ kind: "folder", folder });
   }
 
   function folderDeleteTarget(text: string): Folder | null | undefined {
@@ -810,15 +821,13 @@ export function GenieApp() {
         return;
       }
 
-      const deleted = removeFolder(deleteTarget);
+      deleteFolderNow(deleteTarget);
       setMessages((prev) => [
         ...prev,
         {
           id: uid(),
           role: "genie",
-          text: deleted
-            ? `ลบโฟลเดอร์ "${deleteTarget.name}" ให้แล้วนะ การบ้านข้างในยังอยู่ ไม่ได้ลบตาม`
-            : "โอเค ยังไม่ลบโฟลเดอร์นะ",
+          text: `ลบโฟลเดอร์ "${deleteTarget.name}" ให้แล้วนะ การบ้านข้างในยังอยู่ ไม่ได้ลบตาม`,
         },
       ]);
       return;
@@ -1093,7 +1102,7 @@ export function GenieApp() {
         onFocusChat={focusChat}
         onAddFolder={() => setDialog({ mode: "create" })}
         onEditFolder={(folder) => setDialog({ mode: "edit", folder })}
-        onDeleteFolder={removeFolder}
+        onDeleteFolder={askDeleteFolder}
         onFilterFolder={toggleFolderFilter}
       />
 
@@ -1423,7 +1432,7 @@ export function GenieApp() {
                         colorForName(t.subject, folders)
                       }
                       onToggle={toggle}
-                      onDelete={removeTask}
+                      onDelete={askDeleteTask}
                     />
                   ))}
 
@@ -1611,7 +1620,7 @@ export function GenieApp() {
                             <IconPencil size={13} />
                           </button>
                           <button
-                            onClick={() => removeFolder(folder)}
+                            onClick={() => askDeleteFolder(folder)}
                             aria-label={`ลบโฟลเดอร์ ${folder.name}`}
                             className="focus-ring grid h-7 w-7 place-items-center rounded-full bg-paper/80 text-muted transition hover:text-red"
                           >
@@ -1719,7 +1728,7 @@ export function GenieApp() {
                         colorForName(t.subject, folders)
                       }
                       onToggle={toggle}
-                      onDelete={removeTask}
+                      onDelete={askDeleteTask}
                     />
                   ))}
                 </div>
@@ -1943,6 +1952,39 @@ export function GenieApp() {
         />
       )}
 
+      {confirmDialog && (
+        <ConfirmDialog
+          open
+          title={
+            confirmDialog.kind === "folder"
+              ? "ลบโฟลเดอร์นี้ใช่ไหม?"
+              : "ลบการบ้านนี้ใช่ไหม?"
+          }
+          description={
+            confirmDialog.kind === "folder"
+              ? "การบ้านที่อยู่ในโฟลเดอร์นี้ยังอยู่ครบ ไม่ถูกลบไปด้วยน้า"
+              : "ลบแล้วจะกู้คืนไม่ได้ แต่ยังจดใหม่ในแชทได้ตลอดน้า"
+          }
+          detail={
+            confirmDialog.kind === "folder"
+              ? confirmDialog.folder.name
+              : confirmDialog.title
+          }
+          confirmLabel={
+            confirmDialog.kind === "folder" ? "ลบโฟลเดอร์" : "ลบการบ้าน"
+          }
+          onCancel={() => setConfirmDialog(null)}
+          onConfirm={() => {
+            if (confirmDialog.kind === "folder") {
+              deleteFolderNow(confirmDialog.folder);
+            } else {
+              removeTask(confirmDialog.id);
+            }
+            setConfirmDialog(null);
+          }}
+        />
+      )}
+
       {toast && (
         <div className="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-navy px-5 py-2.5 text-[12px] font-medium text-paper shadow-lg">
           {toast}
@@ -1951,3 +1993,4 @@ export function GenieApp() {
     </div>
   );
 }
+

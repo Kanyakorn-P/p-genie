@@ -1,10 +1,18 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type TouchEvent,
+} from "react";
 import type { Task } from "@/lib/data";
 import { subjectLabel } from "@/lib/data";
 import {
   THAI_MONTHS_FULL,
+  THAI_MONTHS_SHORT,
   formatDueDate,
   startOfDay,
   taskDueDate,
@@ -41,6 +49,9 @@ export function CalendarView({ tasks }: CalendarViewProps) {
     month: number;
   } | null>(null);
   const [selectedState, setSelectedState] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState(0);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   const year = viewState?.year ?? today?.getFullYear() ?? 0;
   const month = viewState?.month ?? today?.getMonth() ?? 0;
@@ -79,6 +90,17 @@ export function CalendarView({ tasks }: CalendarViewProps) {
 
   const selectedTasks = datedTasks.filter((item) => key(item.date) === selected);
 
+  useEffect(() => {
+    if (!pickerOpen) return;
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setPickerOpen(false);
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [pickerOpen]);
+
   function goTo(nextYear: number, nextMonth: number) {
     const normalized = new Date(nextYear, nextMonth, 1);
     setViewState({
@@ -102,6 +124,35 @@ export function CalendarView({ tasks }: CalendarViewProps) {
     setSelectedState(key(today));
   }
 
+  function openPicker() {
+    setPickerYear(year);
+    setPickerOpen((prev) => !prev);
+  }
+
+  function pickMonth(nextMonth: number) {
+    goTo(pickerYear, nextMonth);
+    setPickerOpen(false);
+  }
+
+  function onTouchStart(event: TouchEvent<HTMLDivElement>) {
+    const touch = event.touches[0];
+    touchStart.current = { x: touch.clientX, y: touch.clientY };
+  }
+
+  function onTouchEnd(event: TouchEvent<HTMLDivElement>) {
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start) return;
+
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+
+    // ปัดซ้ายขวาเพื่อเปลี่ยนเดือน ต้องเป็นแนวนอนชัด ๆ เพื่อไม่ให้ทับการกดเลือกวัน
+    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+    shiftMonths(dx < 0 ? 1 : -1);
+  }
+
   if (!today) {
     return (
       <section className="surface soft-shadow min-h-[360px] p-5">
@@ -119,86 +170,172 @@ export function CalendarView({ tasks }: CalendarViewProps) {
   const selectedIsToday = key(selectedDate) === key(today);
 
   return (
-    <section className="order-3 surface soft-shadow p-5">
+    <section className="order-3 surface soft-shadow p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-[17px] font-bold text-navy">ปฏิทินการบ้าน</h2>
           <p className="text-[11.5px] text-muted">
-            เลื่อนเดือนหรือข้ามปีด้วยลูกศรได้เลย
+            กดชื่อเดือนเพื่อเลือกเดือน/ปี หรือปัดซ้ายขวาก็ได้
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button
-            onClick={() => shiftYears(-1)}
-            className="focus-ring grid h-8 w-8 place-items-center rounded-full border border-line text-[12px] font-bold text-navy transition hover:border-blue"
-            aria-label="ย้อนไปปีก่อนหน้า"
-          >
-            «
-          </button>
+
+        <div className="flex items-center gap-1">
           <button
             onClick={() => shiftMonths(-1)}
-            className="focus-ring grid h-8 w-8 place-items-center rounded-full border border-line text-navy transition hover:border-blue"
+            className="focus-ring grid h-10 w-10 place-items-center rounded-full border border-line text-[18px] leading-none text-navy transition hover:border-blue hover:bg-cream sm:h-9 sm:w-9"
             aria-label="เดือนก่อนหน้า"
           >
             ‹
           </button>
-          <label className="relative">
-            <span className="sr-only">เลือกเดือนและปี</span>
-            <select
-              value={`${year}-${month}`}
-              onChange={(event) => {
-                const [nextYear, nextMonth] = event.target.value
-                  .split("-")
-                  .map(Number);
-                goTo(nextYear, nextMonth);
-              }}
-              className="min-w-[148px] cursor-pointer appearance-none rounded-full border border-line bg-paper px-3 py-2 text-center text-[12px] font-bold text-navy outline-none transition hover:border-blue focus:border-blue"
-              aria-label="เลือกเดือนและปี"
+
+          <div className="relative">
+            <button
+              onClick={openPicker}
+              aria-expanded={pickerOpen}
+              aria-haspopup="dialog"
+              className="focus-ring flex h-10 min-w-[132px] items-center justify-center gap-1.5 rounded-full border border-line bg-paper px-3 text-[12px] font-bold text-navy transition hover:border-blue sm:h-9"
             >
-              {Array.from(
-                { length: 17 },
-                (_, index) => today.getFullYear() - 8 + index,
-              ).flatMap((optionYear) =>
-                THAI_MONTHS_FULL.map((monthName, monthIndex) => (
-                  <option
-                    key={`${optionYear}-${monthIndex}`}
-                    value={`${optionYear}-${monthIndex}`}
-                  >
-                    {monthName} {optionYear + 543}
-                  </option>
-                )),
-              )}
-            </select>
-          </label>
+              <span className="truncate">
+                {THAI_MONTHS_SHORT[month]} {year + 543}
+              </span>
+              <span
+                className={`text-[9px] text-muted transition ${pickerOpen ? "rotate-180" : ""}`}
+                aria-hidden="true"
+              >
+                ▾
+              </span>
+            </button>
+
+            {pickerOpen && (
+              <>
+                <button
+                  className="fixed inset-0 z-30 cursor-default"
+                  aria-label="ปิดตัวเลือกเดือน"
+                  onClick={() => setPickerOpen(false)}
+                />
+                <div
+                  role="dialog"
+                  aria-label="เลือกเดือนและปี"
+                  className="surface soft-shadow thin-scroll fixed bottom-3 left-3 right-3 z-40 max-h-[75vh] overflow-y-auto rounded-2xl p-3 sm:absolute sm:bottom-auto sm:left-auto sm:right-0 sm:mt-2 sm:w-[268px]"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <button
+                      onClick={() => setPickerYear((prev) => prev - 1)}
+                      aria-label="ย้อนไปปีก่อนหน้า"
+                      className="focus-ring grid h-9 w-9 place-items-center rounded-full border border-line text-[15px] leading-none text-navy transition hover:border-blue"
+                    >
+                      «
+                    </button>
+                    <div className="text-center">
+                      <p className="text-[13px] font-bold text-navy">
+                        {pickerYear + 543}
+                      </p>
+                      <p className="text-[9.5px] text-muted">พ.ศ.</p>
+                    </div>
+                    <button
+                      onClick={() => setPickerYear((prev) => prev + 1)}
+                      aria-label="ไปปีถัดไป"
+                      className="focus-ring grid h-9 w-9 place-items-center rounded-full border border-line text-[15px] leading-none text-navy transition hover:border-blue"
+                    >
+                      »
+                    </button>
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-3 gap-1.5">
+                    {THAI_MONTHS_SHORT.map((monthName, monthIndex) => {
+                      const active = pickerYear === year && monthIndex === month;
+                      const isThisMonth =
+                        today.getFullYear() === pickerYear &&
+                        today.getMonth() === monthIndex;
+                      return (
+                        <button
+                          key={monthName}
+                          onClick={() => pickMonth(monthIndex)}
+                          aria-pressed={active}
+                          className={`focus-ring h-9 rounded-xl border text-[11.5px] font-semibold transition ${
+                            active
+                              ? "border-blue bg-blue-soft text-navy"
+                              : isThisMonth
+                                ? "border-blue/50 bg-paper text-blue hover:bg-cream"
+                                : "border-line bg-paper text-ink hover:bg-cream"
+                          }`}
+                        >
+                          {monthName}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={() => setPickerYear(today.getFullYear())}
+                      className="focus-ring flex-1 rounded-full border border-line px-3 py-1.5 text-[10.5px] font-semibold text-navy transition hover:border-blue"
+                    >
+                      ปีนี้
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPickerOpen(false);
+                        goToday();
+                      }}
+                      className="focus-ring flex-1 rounded-full bg-navy px-3 py-1.5 text-[10.5px] font-semibold text-paper transition hover:bg-navy-deep"
+                    >
+                      วันนี้
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
           <button
             onClick={() => shiftMonths(1)}
-            className="focus-ring grid h-8 w-8 place-items-center rounded-full border border-line text-navy transition hover:border-blue"
+            className="focus-ring grid h-10 w-10 place-items-center rounded-full border border-line text-[18px] leading-none text-navy transition hover:border-blue hover:bg-cream sm:h-9 sm:w-9"
             aria-label="เดือนถัดไป"
           >
             ›
           </button>
-          <button
-            onClick={() => shiftYears(1)}
-            className="focus-ring grid h-8 w-8 place-items-center rounded-full border border-line text-[12px] font-bold text-navy transition hover:border-blue"
-            aria-label="ไปปีถัดไป"
-          >
-            »
-          </button>
-          <button
-            onClick={goToday}
-            className="focus-ring rounded-full border border-line bg-paper px-2.5 py-1.5 text-[10.5px] font-semibold text-navy transition hover:border-blue"
-          >
-            วันนี้
-          </button>
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold text-muted">
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => shiftYears(-1)}
+            className="focus-ring rounded-full px-2 py-1 text-[10.5px] font-semibold text-muted transition hover:text-navy"
+            aria-label="ย้อนไปปีก่อนหน้า"
+          >
+            « ปีก่อน
+          </button>
+          <button
+            onClick={() => shiftYears(1)}
+            className="focus-ring rounded-full px-2 py-1 text-[10.5px] font-semibold text-muted transition hover:text-navy"
+            aria-label="ไปปีถัดไป"
+          >
+            ปีหน้า »
+          </button>
+        </div>
+        {!isCurrentMonth && (
+          <button
+            onClick={goToday}
+            className="focus-ring rounded-full border border-line bg-paper px-2.5 py-1 text-[10.5px] font-semibold text-navy transition hover:border-blue"
+          >
+            กลับไปวันนี้
+          </button>
+        )}
+      </div>
+
+      <div className="mt-3 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold text-muted">
         {DAYS.map((day) => <span key={day}>{day}</span>)}
       </div>
-      <div className="mt-1 grid grid-cols-7 gap-1">
+
+      <div
+        className="mt-1 grid touch-pan-y grid-cols-7 gap-1"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
         {cells.map((date, index) => {
-          if (!date) return <span key={`empty-${index}`} className="min-h-12" />;
+          if (!date) return <span key={`empty-${index}`} className="min-h-11" />;
           const dateKey = key(date);
           const count = countByDay.get(dateKey) ?? 0;
           const active = selected === dateKey;
@@ -207,18 +344,32 @@ export function CalendarView({ tasks }: CalendarViewProps) {
             <button
               key={dateKey}
               onClick={() => setSelectedState(dateKey)}
-              className={`focus-ring min-h-12 rounded-xl border p-1 text-left transition ${
-                active ? "border-blue bg-blue-soft" : "border-line bg-paper hover:bg-cream"
+              aria-pressed={active}
+              aria-label={`${date.getDate()} ${THAI_MONTHS_FULL[date.getMonth()]}${count > 0 ? ` มี ${count} งาน` : ""}`}
+              className={`focus-ring flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl border py-1 transition sm:min-h-14 ${
+                active
+                  ? "border-blue bg-blue-soft"
+                  : "border-line bg-paper hover:border-blue/60 hover:bg-cream"
               }`}
             >
-              <span className={`text-[11px] font-bold ${isToday ? "text-blue" : "text-navy"}`}>
+              <span
+                className={`text-[11.5px] font-bold ${
+                  isToday
+                    ? "grid h-[19px] min-w-[19px] place-items-center rounded-full bg-navy px-1 text-[10.5px] text-paper"
+                    : "text-navy"
+                }`}
+              >
                 {date.getDate()}
               </span>
-              {count > 0 && (
-                <span className="mt-1 block truncate rounded-full bg-yellow px-1 text-center text-[9px] font-bold text-navy">
-                  {count} งาน
-                </span>
-              )}
+              <span className="flex h-1.5 items-center gap-0.5" aria-hidden="true">
+                {count > 0 &&
+                  Array.from({ length: Math.min(count, 3) }, (_, dot) => (
+                    <span
+                      key={dot}
+                      className={`h-1.5 w-1.5 rounded-full ${active ? "bg-blue" : "bg-yellow"}`}
+                    />
+                  ))}
+              </span>
             </button>
           );
         })}

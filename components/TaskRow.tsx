@@ -56,9 +56,7 @@ export function TaskRow({ task, color, onToggle, onDelete }: TaskRowProps) {
       </div>
 
       <button
-        onClick={() => {
-          if (window.confirm(`ลบ "${task.title}" ออกใช่ไหม?`)) onDelete(task.id);
-        }}
+        onClick={() => onDelete(task.id)}
         aria-label="ลบการบ้าน"
         className="focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted opacity-0 transition hover:bg-red-soft hover:text-red group-hover:opacity-100 focus-visible:opacity-100 max-sm:opacity-100"
       >
