@@ -1869,13 +1869,22 @@ export function GenieApp() {
                 </p>
                 <div className="mt-3 space-y-2">
                   <a
-                    href="https://www.instagram.com/mobius_gotta_go/"
+                    href="https://www.instagram.com/pangolin.9132033/"
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-center justify-between rounded-xl bg-cream px-3 py-2 text-[11px] font-semibold text-navy transition hover:bg-pink-100"
                   >
                     <span>Instagram</span>
                     <span className="text-muted">เปิดลิงก์ ↗</span>
+                  </a>
+                  <a
+                    href="https://discord.com/app"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between rounded-xl bg-cream px-3 py-2 text-[11px] font-semibold text-navy transition hover:bg-blue-soft"
+                  >
+                    <span>Discord: mbius_</span>
+                    <span className="text-muted">เปิด Discord ↗</span>
                   </a>
                   <a
                     href="https://www.facebook.com/share/1JUq5ew4qh/"
