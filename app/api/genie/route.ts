@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { formatDueDate, resolveDue, daysBetween } from "@/lib/due-date";
 
 type GenieTask = {
@@ -45,60 +45,6 @@ function thaiDateLine(today: Date) {
   return `Today is ${weekday} (${iso} Gregorian, ${today.getFullYear() + 543} BE).`;
 }
 
-// โหมดฉลาดสุด: ถาม Google ครั้งเดียวว่ามีรุ่น Pro ให้ใช้ไหม แล้วจำไว้ 1 ชั่วโมง
-let strongCache: { models: string[]; at: number } | null = null;
-
-async function strongModels(key: string): Promise<string[]> {
-  if (strongCache && Date.now() - strongCache.at < 60 * 60 * 1000) {
-    return strongCache.models;
-  }
-
-  const fallback = ["gemini-flash-latest", "gemini-3.1-flash-lite"];
-
-  try {
-    const res = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",
-      {
-        headers: { "x-goog-api-key": key },
-        signal: AbortSignal.timeout(4000),
-      },
-    );
-
-    if (res.ok) {
-      const json = (await res.json()) as {
-        models?: { name?: string; supportedGenerationMethods?: string[] }[];
-      };
-      const names = (json.models ?? [])
-        .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
-        .map((m) => (m.name ?? "").replace(/^models\//, ""))
-        .filter(
-          (name) =>
-            name &&
-            !/tts|image|embedding|vision|thinking|learnlm/i.test(name),
-        );
-
-      const pro = names.find((name) => /pro/i.test(name));
-      const flash =
-        names.find((name) => name === "gemini-flash-latest") ??
-        names.find((name) => /flash/i.test(name) && !/lite/i.test(name));
-
-      const list = [pro, flash, "gemini-3.1-flash-lite"].filter(
-        (name): name is string => Boolean(name),
-      );
-
-      if (list.length > 0) {
-        strongCache = { models: [...new Set(list)], at: Date.now() };
-        return strongCache.models;
-      }
-    }
-  } catch {
-    // ใช้ลิสต์สำรอง
-  }
-
-  strongCache = { models: fallback, at: Date.now() };
-  return fallback;
-}
-
 const SYSTEM_PROMPT = `You are "พี่จินนี่" (P' Genie), a friendly Thai study buddy inside a homework to-do app.
 Your job: read what the student typed (usually Thai, sometimes messy or with typos) and turn it into homework items.
 
@@ -122,7 +68,16 @@ Rules:
 - folders: list of folder names that should exist in the app. Always include the subject of every task you return. If the student asks to organise or separate their homework into folders, add those folder names too. If the student mentions a folder that is not in their current list, add it. Use the same full Thai subject names. Never repeat a name that is already in the student's folder list.
 - Do not create a folder named อื่นๆ.
 - If the message is not about homework (greeting, question, complaint), return an empty tasks list and just answer them in reply.
-- Never invent homework that the student did not mention.`;
+- If the same homework already appears in the saved list, do not add it again. Say it is already recorded.
+- Never invent homework that the student did not mention.
+
+Examples:
+- "ฟิสิกหน้า 45 ส่งพรุ่งนี้" -> one task: title "ทำแบบฝึกหัดหน้า 45", subject "ฟิสิกส์", due "พรุ่งนี้".
+- "คณิตส่ง 30/11" -> one task, due "30/11". 30/11 is 30 November, never 3 November.
+- "สอบกลางภาควิทย์วันที่ 12 ม.ค." said in November -> the exam is next year, keep due "12 ม.ค.".
+- "งานชีวะเรื่องเซลล์ส่งวันศุกร์" -> subject "ชีววิทยา", due "วันศุกร์".
+- "เหนื่อยจัง" / "มีการบ้านเพิ่ม" -> no tasks, reply with a short friendly line or ask what the homework is.
+- "งานอะไรบ้าง" / "พรุ่งนี้ส่งอะไร" -> no new tasks, answer using the saved homework list.`;
 
 const RESPONSE_SCHEMA = {
   type: "object",
@@ -189,86 +144,13 @@ function cleanTask(raw: unknown): GenieTask | null {
   };
 }
 
-// ชั่วคราวสำหรับตรวจว่าคีย์นี้ใช้รุ่นไหนได้บ้าง
-export async function GET(request: Request) {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return NextResponse.json({ error: "no key" }, { status: 503 });
-
-  const url = new URL(request.url);
-  const model = url.searchParams.get("model");
-  if (model) {
-    const started = Date.now();
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": key,
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text:
-                      url.searchParams.get("text") ??
-                      "ตอบสั้น ๆ ว่าได้เลย แล้วบอกว่าวันที่ 30/11 คือวันอะไร ถ้าวันนี้คือ 15 พ.ย. 2026",
-                  },
-                ],
-              },
-            ],
-            generationConfig: { maxOutputTokens: 120, temperature: 0.2 },
-          }),
-          signal: AbortSignal.timeout(30000),
-        },
-      );
-      const text = await res.text();
-      return NextResponse.json({
-        model,
-        ms: Date.now() - started,
-        status: res.status,
-        body: text.slice(0, 500),
-      });
-    } catch (error) {
-      return NextResponse.json({
-        model,
-        ms: Date.now() - started,
-        error: error instanceof Error ? error.message : "failed",
-      });
-    }
-  }
-
-  try {
-    const res = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",
-      { headers: { "x-goog-api-key": key }, signal: AbortSignal.timeout(8000) },
-    );
-    const json = (await res.json()) as {
-      models?: { name?: string; supportedGenerationMethods?: string[] }[];
-    };
-    const names = (json.models ?? [])
-      .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
-      .map((m) => (m.name ?? "").replace(/^models\//, ""))
-      .filter((n) => /gemini/i.test(n))
-      .sort();
-    return NextResponse.json({ count: names.length, names });
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "failed" },
-      { status: 502 },
-    );
-  }
-}
-
 export async function POST(request: Request) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     return NextResponse.json({ error: "ยังไม่ได้ใส่ GEMINI_API_KEY" }, { status: 503 });
   }
 
-  let body: { text?: unknown; folders?: unknown; mode?: unknown };
+  let body: { text?: unknown; folders?: unknown; mode?: unknown; tasks?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -279,12 +161,7 @@ export async function POST(request: Request) {
   if (!text) {
     return NextResponse.json({ error: "ยังไม่มีข้อความ" }, { status: 400 });
   }
-  const mode =
-    body.mode === "balanced"
-      ? "balanced"
-      : body.mode === "smart"
-        ? "smart"
-        : "economy";
+  const mode = body.mode === "balanced" ? "balanced" : "economy";
 
   const folders = Array.isArray(body.folders)
     ? body.folders
@@ -297,6 +174,32 @@ export async function POST(request: Request) {
       ? `The student already made these folders: ${folders.join(", ")}. Use one of them when it fits.`
       : "The student has no folders yet, so use plain subject names.";
 
+  const taskList = Array.isArray(body.tasks)
+    ? body.tasks
+        .filter((item): item is Record<string, unknown> =>
+          Boolean(item) && typeof item === "object",
+        )
+        .slice(0, 30)
+        .map((item) => ({
+          title: typeof item.title === "string" ? item.title.slice(0, 100) : "",
+          subject:
+            typeof item.subject === "string" ? item.subject.slice(0, 40) : "",
+          due: typeof item.due === "string" ? item.due.slice(0, 40) : "",
+          done: item.done === true,
+        }))
+        .filter((item) => item.title.length > 0)
+    : [];
+
+  const taskLine =
+    taskList.length > 0
+      ? `The student's saved homework right now: ${taskList
+          .map(
+            (task) =>
+              `${task.subject}: ${task.title} (due ${task.due}${task.done ? ", done" : ""})`,
+          )
+          .join(" | ")}. Use this list when answering questions about their homework, counts, or what is due. Never invent homework that is not in this list.`
+      : "The student has no homework saved yet.";
+
   const today = bangkokToday();
   const dateLine = thaiDateLine(today);
 
@@ -307,7 +210,7 @@ export async function POST(request: Request) {
         role: "user",
         parts: [
           {
-            text: `${dateLine}\n${folderLine}\n\nข้อความจากนักเรียน: ${text}`,
+            text: `${dateLine}\n${folderLine}\n${taskLine}\n\nข้อความจากนักเรียน: ${text}`,
           },
         ],
       },
@@ -322,21 +225,19 @@ export async function POST(request: Request) {
 
   let lastError = "ต่อ Gemini ไม่ได้";
   const startedAt = Date.now();
-  const BUDGET_MS = mode === "smart" ? 26000 : 16000;
-  const attemptTimeout = mode === "smart" ? 12000 : ATTEMPT_TIMEOUT_MS;
+  const BUDGET_MS = 16000;
+  const attemptTimeout = ATTEMPT_TIMEOUT_MS;
   const quickRequest =
     text.length <= 90 &&
     !/(และ|กับ|หลาย|แยก|โฟลเดอร์|ช่วยจัด|ช่วยคิด|อะไรบ้าง|ไหนบ้าง)/.test(text);
   // ประหยัด = Lite ก่อนถ้างานง่าย, งานยากข้ามไป Flash
-  // สมดุล = Flash ก่อน, ฉลาดสุด = Pro ก่อนแล้วถอยลงมา
+  // สมดุล = Flash ก่อนแล้วถอยลงมา Lite
   const models =
-    mode === "smart"
-      ? await strongModels(key)
-      : mode === "balanced"
-        ? ["gemini-flash-latest", "gemini-3.1-flash-lite", "gemini-flash-lite-latest"]
-        : quickRequest
-          ? ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.1-flash-lite"]
-          : ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-3.1-flash-lite"];
+    mode === "balanced"
+      ? ["gemini-flash-latest", "gemini-3.1-flash-lite", "gemini-flash-lite-latest"]
+      : quickRequest
+        ? ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.1-flash-lite"]
+        : ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-3.1-flash-lite"];
 
   // ลองรุ่นที่เบากว่า + ลองซ้ำอีกรอบ เผื่อ Google ตอบ 503 เพราะคนใช้เยอะ
   for (let round = 0; round < 2; round += 1) {

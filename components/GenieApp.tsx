@@ -106,10 +106,10 @@ const subscribeAiMode = (callback: () => void) => {
   window.addEventListener("p-genie-ai-mode", callback);
   return () => window.removeEventListener("p-genie-ai-mode", callback);
 };
-const getAiMode = (): AiMode => {
-  const stored = window.localStorage.getItem(AI_MODE_KEY);
-  return stored === "balanced" || stored === "smart" ? stored : "economy";
-};
+const getAiMode = (): AiMode =>
+  window.localStorage.getItem(AI_MODE_KEY) === "balanced"
+    ? "balanced"
+    : "economy";
 const getOnboardingDismissed = () =>
   window.localStorage.getItem(ONBOARDING_KEY) === "1";
 
@@ -890,11 +890,17 @@ export function GenieApp() {
       text,
       folders.map((f) => f.name),
       aiMode,
+      tasks.slice(0, 30).map((task) => ({
+        title: task.title,
+        subject: task.subject,
+        due: task.due,
+        done: task.done,
+      })),
     );
 
     setThinking(false);
 
-    const parsed = ai && ai.tasks.length > 0 ? ai.tasks : parseTasks(text);
+    const parsed = ai ? ai.tasks : parseTasks(text);
     const aiReply = ai && ai.tasks.length > 0 ? ai.reply : "";
 
     // สร้างโฟลเดอร์จากวิชาของงาน + โฟลเดอร์ที่พี่จินนี่บอกว่าควรมี
@@ -907,6 +913,26 @@ export function GenieApp() {
       ...p,
       subject: canonical.get(p.subject) ?? p.subject,
     }));
+
+    // กันงานซ้ำ ถ้ามีชื่อและวิชาเดิมอยู่แล้ว
+    const existingKeys = new Set(
+      tasks.map((task) => `${task.subject}|${task.title}`.trim().toLowerCase()),
+    );
+    const fresh = normalized.filter(
+      (p) => !existingKeys.has(`${p.subject}|${p.title}`.trim().toLowerCase()),
+    );
+
+    if (normalized.length > 0 && fresh.length === 0) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uid(),
+          role: "genie",
+          text: "งานนี้จดไว้แล้วน้า ไม่ต้องเพิ่มซ้ำก็ได้ ✨",
+        },
+      ]);
+      return;
+    }
 
     if (normalized.length === 0) {
       const folderLine =
@@ -931,7 +957,7 @@ export function GenieApp() {
     }
 
     const now = new Date();
-    const newTasks: Task[] = normalized.map((p) => {
+    const newTasks: Task[] = fresh.map((p) => {
       // เก็บเป็นวันที่จริง เช่น 16 พ.ย. ไม่เก็บคำว่า "พรุ่งนี้" เพราะจะเลื่อนทุกวัน
       const due = p.due === "ยังไม่ระบุวันส่ง" ? p.due : canonicalDue(p.due, now) ?? p.due;
       return {
@@ -971,7 +997,7 @@ export function GenieApp() {
       {
         id: uid(),
         role: "genie",
-        text: `${aiReply ? `${aiReply}\n` : `จดให้แล้ว ${normalized.length} งานน้า ✨\n`}${list}${folderLine}${dueQuestion}`,
+        text: `${aiReply ? `${aiReply}\n` : `จดให้แล้ว ${newTasks.length} งานน้า ✨\n`}${list}${folderLine}${dueQuestion}`,
       },
     ]);
   }

@@ -140,11 +140,6 @@ export function ChatPanel({
                     title: "สมดุล",
                     detail: "เข้าใจข้อความซับซ้อนขึ้น",
                   },
-                  {
-                    mode: "smart" as AiMode,
-                    title: "ฉลาดสุด",
-                    detail: "แม่นที่สุด ช้าขึ้นเล็กน้อย",
-                  },
                 ].map((option) => (
                   <button
                     key={option.mode}
@@ -192,11 +187,11 @@ export function ChatPanel({
           <button
             type="button"
             onClick={() => setAiModeOpen((open) => !open)}
-            aria-label={`โหมด AI ปัจจุบัน: ${aiMode === "economy" ? "ประหยัด" : aiMode === "balanced" ? "สมดุล" : "ฉลาดสุด"}`}
+            aria-label={`โหมด AI ปัจจุบัน: ${aiMode === "economy" ? "ประหยัด" : "สมดุล"}`}
             aria-expanded={aiModeOpen}
             className="focus-ring shrink-0 rounded-full border border-line bg-paper px-2 py-1.5 text-[9px] font-bold text-navy transition hover:border-blue"
           >
-            {aiMode === "economy" ? "ประหยัด" : aiMode === "balanced" ? "สมดุล" : "ฉลาดสุด"}
+            {aiMode === "economy" ? "ประหยัด" : "สมดุล"}
           </button>
           <button
             type="submit"
