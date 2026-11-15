@@ -190,9 +190,56 @@ function cleanTask(raw: unknown): GenieTask | null {
 }
 
 // ชั่วคราวสำหรับตรวจว่าคีย์นี้ใช้รุ่นไหนได้บ้าง
-export async function GET() {
+export async function GET(request: Request) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return NextResponse.json({ error: "no key" }, { status: 503 });
+
+  const url = new URL(request.url);
+  const model = url.searchParams.get("model");
+  if (model) {
+    const started = Date.now();
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": key,
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text:
+                      url.searchParams.get("text") ??
+                      "ตอบสั้น ๆ ว่าได้เลย แล้วบอกว่าวันที่ 30/11 คือวันอะไร ถ้าวันนี้คือ 15 พ.ย. 2026",
+                  },
+                ],
+              },
+            ],
+            generationConfig: { maxOutputTokens: 120, temperature: 0.2 },
+          }),
+          signal: AbortSignal.timeout(30000),
+        },
+      );
+      const text = await res.text();
+      return NextResponse.json({
+        model,
+        ms: Date.now() - started,
+        status: res.status,
+        body: text.slice(0, 500),
+      });
+    } catch (error) {
+      return NextResponse.json({
+        model,
+        ms: Date.now() - started,
+        error: error instanceof Error ? error.message : "failed",
+      });
+    }
+  }
+
   try {
     const res = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",
