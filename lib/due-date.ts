@@ -172,10 +172,7 @@ export function resolveDue(
 
   if (/เดือนหน้า/.test(text)) return clampMonth(base, 1);
 
-  if (
-    /สัปดาห์หน้า|สัปดาห์ถัดไป|วีคหน้า/.test(text) ||
-    /(?:^|[^น])อาทิตย์หน้า/.test(text)
-  ) {
+  if (/สัปดาห์หน้า|สัปดาห์ถัดไป|วีคหน้า/.test(text)) {
     const delta = (8 - base.getDay()) % 7 || 7;
     return addDays(base, delta);
   }
@@ -212,7 +209,7 @@ export function resolveDue(
 
   for (const weekday of WEEKDAYS) {
     const match = text.match(
-      new RegExp(`วัน${weekday.name}\\s*(หน้า|นี้|ถัดไป)?`),
+      new RegExp(`(?:วัน)?${weekday.name}\\s*(หน้า|นี้|ถัดไป)?`),
     );
     if (!match) continue;
 
