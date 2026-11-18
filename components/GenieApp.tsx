@@ -83,6 +83,9 @@ const START_MESSAGE: ChatMessage = {
 };
 
 const ONBOARDING_KEY = "p-genie-onboarding-dismissed-v1";
+// ความชอบการแจ้งเตือนหน้าแนะนำ: "never" = ไม่ถามอีก, "always" = ถามทุกครั้ง,
+// ไม่มีค่า = ค่าเดิมคือถามครั้งแรกครั้งเดียว
+const ONBOARDING_PREF_KEY = "p-genie-onboarding-pref-v1";
 const ONBOARDING_STEPS = [
   {
     title: "พิมพ์งานที่อยากจดได้เลย",
@@ -114,8 +117,21 @@ const getAiMode = (): AiMode =>
   window.localStorage.getItem(AI_MODE_KEY) === "balanced"
     ? "balanced"
     : "economy";
-const getOnboardingDismissed = () =>
-  window.localStorage.getItem(ONBOARDING_KEY) === "1";
+type OnboardingPref = "never" | "always";
+
+function getOnboardingPref(): OnboardingPref | null {
+  try {
+    const saved = window.localStorage.getItem(ONBOARDING_PREF_KEY);
+    if (saved === "never" || saved === "always") return saved;
+    // ผู้ใช้เวอร์ชันก่อนที่กดปิดไปแล้ว ถือว่าเลือก "ไม่ต้องแจ้งแล้ว"
+    if (window.localStorage.getItem(ONBOARDING_KEY) === "1") return "never";
+  } catch {
+    // อ่าน localStorage ไม่ได้ ก็ใช้ค่าเริ่มต้น
+  }
+  return null;
+}
+
+const getOnboardingDismissed = () => getOnboardingPref() === "never";
 
 const CHIPS = [
   "ฟิสิกส์หน้า 45 ส่งพรุ่งนี้",
@@ -284,12 +300,29 @@ export function GenieApp() {
     window.dispatchEvent(new Event("p-genie-ai-mode"));
   }
 
-  function closeOnboarding() {
+  function saveOnboardingPref(pref: OnboardingPref) {
     try {
-      window.localStorage.setItem(ONBOARDING_KEY, "1");
+      window.localStorage.setItem(ONBOARDING_PREF_KEY, pref);
     } catch {
       // ไม่เป็นไร ถ้าบันทึกไม่ได้
     }
+  }
+
+  // ปิดจากในหน้าแนะนำ: ถ้าเลือก "แจ้งเตือนทุกครั้ง" ไว้ก็ยังถามต่อครั้งหน้า
+  function closeOnboarding() {
+    if (getOnboardingPref() !== "always") saveOnboardingPref("never");
+    setOnboarding(null);
+  }
+
+  // เลือก "ไม่ต้องแจ้งแล้ว" = ปิดถาวร ไม่ถามอีกเลย
+  function stopOnboardingReminders() {
+    saveOnboardingPref("never");
+    setOnboarding(null);
+  }
+
+  // เลือก "แจ้งเตือนทุกครั้ง" = ถามใหม่ทุกครั้งที่เปิดแอป
+  function remindOnboardingAlways() {
+    saveOnboardingPref("always");
     setOnboarding(null);
   }
 
@@ -2042,20 +2075,42 @@ export function GenieApp() {
                   </p>
                   <p className="mt-1 text-[12px] leading-relaxed text-muted">
                     ใช้เวลาไม่ถึง 1 นาที จะได้รู้ว่าพิมพ์งานยังไงและดูงานตรงไหน
+                    เลือกได้เลยว่าอยากให้ถามเรื่องนี้อีกเมื่อไหร่
                   </p>
                 </div>
                 <div className="mt-4 grid gap-2">
                   <button
                     onClick={() => setOnboarding("guide")}
-                    className="focus-ring rounded-2xl bg-navy px-4 py-3 text-[12px] font-semibold text-paper transition hover:bg-navy-deep"
+                    className="focus-ring rounded-2xl bg-navy px-4 py-3 text-left text-paper transition hover:bg-navy-deep"
                   >
-                    ต้องการคำแนะนำ
+                    <span className="block text-[12px] font-semibold">
+                      แจ้งเตือนในครั้งนี้
+                    </span>
+                    <span className="mt-0.5 block text-[10px] font-normal text-paper/75">
+                      ดูคำแนะนำเลยครั้งนี้ครั้งเดียว
+                    </span>
                   </button>
                   <button
-                    onClick={closeOnboarding}
-                    className="focus-ring rounded-2xl border border-line px-4 py-3 text-[12px] font-semibold text-muted transition hover:bg-cream"
+                    onClick={stopOnboardingReminders}
+                    className="focus-ring rounded-2xl border border-line px-4 py-3 text-left transition hover:bg-cream"
                   >
-                    ไม่ต้องการแนะนำ
+                    <span className="block text-[12px] font-semibold text-navy">
+                      ไม่ต้องแจ้งแล้ว
+                    </span>
+                    <span className="mt-0.5 block text-[10px] text-muted">
+                      ปิดถาวร ไม่ถามเรื่องนี้อีก
+                    </span>
+                  </button>
+                  <button
+                    onClick={remindOnboardingAlways}
+                    className="focus-ring rounded-2xl border border-line px-4 py-3 text-left transition hover:bg-cream"
+                  >
+                    <span className="block text-[12px] font-semibold text-navy">
+                      แจ้งเตือนทุกครั้ง
+                    </span>
+                    <span className="mt-0.5 block text-[10px] text-muted">
+                      ถามทุกครั้งที่เปิดแอป
+                    </span>
                   </button>
                 </div>
               </>
