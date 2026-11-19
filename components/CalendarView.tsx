@@ -224,7 +224,10 @@ export function CalendarView({ tasks }: CalendarViewProps) {
   const selectedIsToday = key(selectedDate) === key(today);
 
   return (
-    <section className="order-3 col-span-2 surface soft-shadow p-3 sm:col-span-2 sm:p-5">
+    <section
+      data-tour="calendar"
+      className="order-3 col-span-2 surface soft-shadow p-3 sm:col-span-2 sm:p-5"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-[15px] font-bold text-navy sm:text-[17px]">

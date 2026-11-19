@@ -170,6 +170,7 @@ export function ChatPanel({
           </>
         )}
         <form
+          data-tour="chat"
           onSubmit={(e) => {
             e.preventDefault();
             onSend();

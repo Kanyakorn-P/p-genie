@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -76,6 +77,10 @@ import {
   IconTrash,
 } from "./ui-icons";
 
+// ฝั่งเซิร์ฟเวอร์ไม่ต้องใช้ useLayoutEffect กัน warning ตอน pre-render
+const useClientLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 const START_MESSAGE: ChatMessage = {
   id: "hello",
   role: "genie",
@@ -89,19 +94,23 @@ const ONBOARDING_PREF_KEY = "p-genie-onboarding-pref-v1";
 const ONBOARDING_STEPS = [
   {
     title: "พิมพ์งานที่อยากจดได้เลย",
-    text: "การบ้านบอกวิชากับรายละเอียด ส่วนธุระหรือนัดหมายบอกสิ่งที่ต้องทำและวันเวลาได้เลย",
+    text: "กรอบสีฟ้าชี้ไปที่ช่องแชท พิมพ์งานได้เลย เช่น ฟิสิกส์หน้า 45 ส่งพรุ่งนี้ หรือธุระที่ต้องทำ แล้วกดส่ง",
+    targets: ['[data-tour="chat"]', '[data-tour="chat-nav"]'],
   },
   {
-    title: "ยังไม่รู้กำหนดก็จดไว้ก่อนได้",
-    text: "การบ้านที่ยังไม่ระบุกำหนด พี่จินนี่จะถามวันส่ง ส่วนงานทั่วไปจะไม่ถามวันต่อ",
+    title: "ดูวันส่งจากแถบสัปดาห์นี้",
+    text: "แถบสัปดาห์นี้สรุปงานของทุกวัน กดวันไหนก็กรองงานวันนั้นทันที ส่วนการบ้านที่ยังไม่ระบุกำหนด พี่จินนี่จะถามวันส่งให้เอง",
+    targets: ['[data-tour="week"]'],
   },
   {
     title: "โฟลเดอร์สร้างและจัดให้เอง",
-    text: "พิมพ์ “ฟิ” หรือ “วิทย์เรื่องเซลล์” ก็จะจับเข้าฟิสิกส์หรือชีววิทยาให้",
+    text: "พิมพ์ “ฟิ” หรือ “วิทย์เรื่องเซลล์” ก็จะจับเข้าฟิสิกส์หรือชีววิทยาให้ ทุกโฟลเดอร์อยู่ในกรอบที่ชี้ไว้",
+    targets: ['[data-tour="folders"]'],
   },
   {
     title: "ดูงานได้หลายแบบ",
-    text: "ใช้กำหนดการสัปดาห์นี้ ปฏิทินการบ้าน และค้นหางานที่ต้องส่งวันนี้ได้เลย",
+    text: "ปฏิทินด้านล่างแสดงงานทั้งเดือน กดวันที่มีจุดสีฟ้าเพื่อดูงานวันนั้น หรือค้นหางานจากช่องค้นหาด้านบนก็ได้",
+    targets: ['[data-tour="calendar"]', '[data-tour="search"]'],
   },
 ];
 const subscribeOnboarding = (callback: () => void) => {
@@ -143,6 +152,16 @@ type Filter =
   | { kind: "folder"; id: string; name: string }
   | { kind: "due"; key: string }
   | null;
+
+// ตำแหน่งจุดที่กำลังแนะนำบนจอ (พิกัด viewport)
+type TourSpot = {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  vw: number;
+  vh: number;
+};
 
 type ProgressRow = {
   key: string;
@@ -325,6 +344,150 @@ export function GenieApp() {
     saveOnboardingPref("always");
     setOnboarding(null);
   }
+
+  // ---- โหมดแนะนำแบบส่องจุด: กรอบชี้ไปที่ส่วนที่กำลังอธิบาย ----
+  const [tourSpot, setTourSpot] = useState<TourSpot | null>(null);
+  const [tourDialogPos, setTourDialogPos] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+  const tourDialogRef = useRef<HTMLDivElement>(null);
+
+  const measureTour = useCallback(() => {
+    if (onboarding !== "guide") return;
+
+    const step = ONBOARDING_STEPS[onboardingStep];
+    let target: HTMLElement | null = null;
+    for (const selector of step.targets) {
+      const found = document.querySelector<HTMLElement>(selector);
+      if (found && found.getClientRects().length > 0) {
+        target = found;
+        break;
+      }
+    }
+    if (!target) {
+      setTourSpot(null);
+      return;
+    }
+
+    const vh = window.innerHeight;
+    let rect = target.getBoundingClientRect();
+    if (rect.bottom < 8 || rect.top > vh - 8) {
+      target.scrollIntoView({ block: "center" });
+      rect = target.getBoundingClientRect();
+    }
+    if (rect.width < 8 || rect.height < 8) {
+      setTourSpot(null);
+      return;
+    }
+
+    const next: TourSpot = {
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+      vw: window.innerWidth,
+      vh,
+    };
+    setTourSpot((prev) =>
+      prev &&
+      Math.abs(prev.top - next.top) < 0.5 &&
+      Math.abs(prev.left - next.left) < 0.5 &&
+      Math.abs(prev.width - next.width) < 0.5 &&
+      Math.abs(prev.height - next.height) < 0.5 &&
+      prev.vw === next.vw &&
+      prev.vh === next.vh
+        ? prev
+        : next,
+    );
+  }, [onboarding, onboardingStep]);
+
+  useClientLayoutEffect(() => {
+    if (onboarding !== "guide") {
+      setTourSpot(null);
+      setTourDialogPos(null);
+      return;
+    }
+
+    measureTour();
+
+    let frame = 0;
+    const onViewportChange = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(measureTour);
+    };
+    window.addEventListener("resize", onViewportChange);
+    window.addEventListener("scroll", onViewportChange, true);
+
+    // ล็อกไม่ให้เลื่อนหนีจุดที่กำลังแนะนำ
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", onViewportChange);
+      window.removeEventListener("scroll", onViewportChange, true);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [onboarding, onboardingStep, measureTour]);
+
+  // วางกล่องคำแนะนำไว้ใต้จุดที่ส่อง ถ้าไม่พอคือวางไว้เหนือจุดนั้น
+  useClientLayoutEffect(() => {
+    if (onboarding !== "guide" || !tourSpot) {
+      setTourDialogPos(null);
+      return;
+    }
+    const dialog = tourDialogRef.current;
+    if (!dialog) return;
+
+    const height = dialog.offsetHeight;
+    const width = dialog.offsetWidth;
+    const gap = 16;
+    const margin = 12;
+    const belowSpace = tourSpot.vh - (tourSpot.top + tourSpot.height);
+
+    let top: number;
+    if (belowSpace >= height + gap) {
+      top = tourSpot.top + tourSpot.height + gap;
+    } else if (tourSpot.top >= height + gap) {
+      top = tourSpot.top - height - gap;
+    } else {
+      top = Math.min(
+        Math.max(margin, tourSpot.top + tourSpot.height + gap),
+        tourSpot.vh - height - margin,
+      );
+    }
+
+    const left = Math.min(
+      Math.max(margin, tourSpot.left + tourSpot.width / 2 - width / 2),
+      tourSpot.vw - width - margin,
+    );
+
+    setTourDialogPos((prev) =>
+      prev && prev.top === top && prev.left === left ? prev : { top, left },
+    );
+  }, [onboarding, onboardingStep, tourSpot]);
+
+  const tourActive = onboarding === "guide" && Boolean(tourSpot && tourDialogPos);
+  const tourBoxes: { top: number; left: number; width: number; height: number }[] =
+    tourActive && tourSpot
+      ? [
+          { top: 0, left: 0, width: tourSpot.vw, height: Math.max(0, tourSpot.top) },
+          {
+            top: tourSpot.top + tourSpot.height,
+            left: 0,
+            width: tourSpot.vw,
+            height: Math.max(0, tourSpot.vh - tourSpot.top - tourSpot.height),
+          },
+          { top: tourSpot.top, left: 0, width: Math.max(0, tourSpot.left), height: tourSpot.height },
+          {
+            top: tourSpot.top,
+            left: tourSpot.left + tourSpot.width,
+            width: Math.max(0, tourSpot.vw - tourSpot.left - tourSpot.width),
+            height: tourSpot.height,
+          },
+        ]
+      : [];
 
   const chatInputRef = useRef<HTMLInputElement>(null);
   const mounted = useMounted();
@@ -1204,7 +1367,10 @@ export function GenieApp() {
             </div>
           </button>
 
-          <label className="order-3 flex basis-full min-w-0 flex-1 items-center gap-2 rounded-full border border-line bg-paper px-4 py-2 transition focus-within:border-blue sm:order-none sm:basis-auto">
+          <label
+            data-tour="search"
+            className="order-3 flex basis-full min-w-0 flex-1 items-center gap-2 rounded-full border border-line bg-paper px-4 py-2 transition focus-within:border-blue sm:order-none sm:basis-auto"
+          >
             <IconSearch size={16} className="shrink-0 text-muted" />
             <input
               value={query}
@@ -1648,7 +1814,7 @@ export function GenieApp() {
               </div>
             </section>
 
-            <section className="order-5 col-span-2">
+            <section data-tour="folders" className="order-5 col-span-2">
               <div className="surface soft-shadow p-4 sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
@@ -1749,6 +1915,7 @@ export function GenieApp() {
 
             <section
               id="reminder"
+              data-tour="week"
               className="order-1 col-span-2 scroll-mt-24"
             >
               <div className="surface soft-shadow p-4 sm:p-5">
@@ -1877,6 +2044,7 @@ export function GenieApp() {
             <button
               key={key}
               onClick={() => handleNav(key)}
+              data-tour={key === "chat" ? "chat-nav" : undefined}
               className={`focus-ring flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 text-[9px] font-semibold transition ${
                 activeNav === key ? "text-navy" : "text-muted"
               }`}
@@ -2060,13 +2228,57 @@ export function GenieApp() {
       )}
 
       {mounted && !onboardingDismissed && onboarding && (
-        <div className="fixed inset-0 z-[60] grid place-items-center bg-navy/25 px-4 backdrop-blur-[2px]">
+        <>
+          {tourActive && tourSpot && (
+            <>
+              {tourBoxes.map((box, index) => (
+                <div
+                  key={`tour-box-${index}`}
+                  className="fixed z-[55] bg-navy/65"
+                  style={{
+                    top: box.top,
+                    left: box.left,
+                    width: box.width,
+                    height: box.height,
+                  }}
+                />
+              ))}
+              {/* จุดที่ชี้: ปล่อยให้กดทะลุไปถึงของจริง ส่วนที่เหลือมีแผ่นปิดทับ */}
+              <div
+                className="pointer-events-none fixed z-[56] rounded-2xl border-2 border-blue shadow-[0_0_0_5px_rgba(59,130,246,0.3),0_12px_32px_rgba(15,23,42,0.4)]"
+                style={{
+                  top: tourSpot.top - 6,
+                  left: tourSpot.left - 6,
+                  width: tourSpot.width + 12,
+                  height: tourSpot.height + 12,
+                }}
+              />
+            </>
+          )}
           <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="onboarding-title"
-            className="soft-shadow w-full max-w-[420px] rounded-3xl border border-line bg-paper p-5"
+            className={
+              tourActive
+                ? "pointer-events-none fixed inset-0 z-[60] px-4"
+                : "fixed inset-0 z-[60] grid place-items-center bg-navy/25 px-4 backdrop-blur-[2px]"
+            }
           >
+            <div
+              ref={tourDialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="onboarding-title"
+              className="soft-shadow w-full max-w-[420px] rounded-3xl border border-line bg-paper p-5"
+              style={
+                tourActive && tourDialogPos
+                  ? {
+                      position: "absolute",
+                      top: tourDialogPos.top,
+                      left: tourDialogPos.left,
+                      pointerEvents: "auto",
+                    }
+                  : undefined
+              }
+            >
             {onboarding === "ask" ? (
               <>
                 <div className="rounded-2xl bg-yellow-soft p-4">
@@ -2133,6 +2345,12 @@ export function GenieApp() {
                 <p className="mt-2 min-h-[58px] text-[12px] leading-relaxed text-muted">
                   {ONBOARDING_STEPS[onboardingStep].text}
                 </p>
+                {tourActive && (
+                  <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-blue-soft px-3 py-1 text-[10px] font-semibold text-navy">
+                    <span className="h-2.5 w-2.5 rounded-[4px] border-2 border-blue" />
+                    ลองกดจุดที่มีกรอบสีฟ้าได้เลย จุดอื่นจะยังกดไม่ได้
+                  </p>
+                )}
                 <div className="mt-5 flex items-center justify-between">
                   <div className="flex gap-1">
                     {ONBOARDING_STEPS.map((_, index) => (
@@ -2161,8 +2379,9 @@ export function GenieApp() {
                 </div>
               </>
             )}
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {dialog && (
