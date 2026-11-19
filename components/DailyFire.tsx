@@ -250,6 +250,29 @@ export function DailyFire({
               )}
             </div>
 
+            <div
+              className={`relative mx-auto mt-3 grid h-[104px] w-[104px] place-items-center rounded-full transition ${
+                checked
+                  ? `bg-${data.color}-soft ring-4 ring-${data.color}/40`
+                  : "bg-cream-deep"
+              }`}
+            >
+              <span
+                className={`select-none text-[56px] leading-none transition-all duration-500 ${
+                  checked
+                    ? `scale-110 drop-shadow-[0_8px_16px_rgba(${data.color},0.45)]`
+                    : `scale-95 opacity-60`
+                }`}
+              >
+                🔥
+              </span>
+              {justCharged && (
+                <span className="absolute -right-1 top-1 animate-bounce rounded-full bg-red px-2 py-0.5 text-[12px] font-bold text-paper">
+                  +1
+                </span>
+              )}
+            </div>
+
             <h2
               id="fire-title"
               className="font-mali mt-4 text-[20px] font-bold text-navy"
@@ -261,6 +284,16 @@ export function DailyFire({
                 ? "พรุ่งนี้กลับมาต่อไฟอีกนะ"
                 : "เข้ามากดเติมไฟวันละครั้ง ไฟจะไม่ดับ"}
             </p>
+
+            {/* ปุ่มปิดแบบชัดเจน */}
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="ปิดหน้าต่างเติมไฟ"
+              className="mt-2 w-full rounded-2xl bg-cream px-4 py-2 text-[11px] font-medium text-navy transition hover:bg-yellow-soft"
+            >
+              ✕ ปิดหน้าต่าง
+            </button>
 
             <p className="font-mali mt-3 text-[34px] font-bold leading-none text-navy">
               {streak} <span className="text-[16px] font-semibold">วันติด</span>
