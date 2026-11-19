@@ -1392,7 +1392,7 @@ export function GenieApp() {
           </label>
 
           <div className="ml-auto flex items-center gap-2">
-            <DailyFire ready={ready && mounted} paused={onboarding !== null} />
+            <DailyFire ready={ready && mounted} paused={onboarding === "guide"} />
             <button
               onClick={() => setDarkMode((enabled) => !enabled)}
               aria-label={darkMode ? "เปลี่ยนเป็นโหมดสว่าง" : "เปลี่ยนเป็นโหมดมืด"}
