@@ -57,6 +57,7 @@ import { ChatPanel, type ChatMessage } from "./ChatPanel";
 import { AccountAvatar } from "./AccountAvatar";
 import { CalendarView } from "./CalendarView";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { DailyFire } from "./DailyFire";
 import { FolderDialog } from "./FolderDialog";
 import { GenieFace } from "./GenieFace";
 import { LoginPanel } from "./LoginPanel";
@@ -1391,6 +1392,7 @@ export function GenieApp() {
           </label>
 
           <div className="ml-auto flex items-center gap-2">
+            <DailyFire ready={ready && mounted} paused={onboarding !== null} />
             <button
               onClick={() => setDarkMode((enabled) => !enabled)}
               aria-label={darkMode ? "เปลี่ยนเป็นโหมดสว่าง" : "เปลี่ยนเป็นโหมดมืด"}
